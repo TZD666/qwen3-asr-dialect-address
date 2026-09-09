@@ -1,0 +1,28 @@
+[project]
+name = "dialect-addr"
+version = "0.1.0"
+description = "Qwen3-ASR-1.7B 方言地址识别：多音系检索 + 两遍解码 + 确定性归一化"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "torch>=2.4",
+    "transformers>=5.13,<6",
+    "accelerate>=0.30",
+    "safetensors>=0.4",
+    "numpy>=1.26,<3",
+    "soundfile>=0.12",
+    "librosa>=0.10",
+    "pypinyin>=0.53,<1",
+]
+
+[project.optional-dependencies]
+# 方言音系扩展：未装时 romanize.py 自动降级到普通话近似，主链路不受影响
+dialect = ["pycantonese>=3.4", "taibun>=0.5"]
+# 只跑文本链路（不下模型权重）所需的最小集合
+text-only = ["pypinyin>=0.53,<1", "numpy>=1.26,<3"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

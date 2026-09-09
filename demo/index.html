@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方言地址识别 · Qwen3-ASR-1.7B</title>
+<style>
+  :root{
+    --bg:#f5f5f7; --card:#fff; --ink:#1d1d1f; --muted:#6e6e73; --line:#e5e5ea;
+    --accent:#0071e3; --ok:#34c759; --warn:#ff9f0a; --bad:#ff3b30; --chip:#f2f2f7;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+  h1{font-size:26px;letter-spacing:-.02em;margin:0;font-weight:600}
+  h1 small{font-weight:400;color:var(--muted);font-size:14px;margin-left:10px}
+  .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:13px;color:var(--muted)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--warn)}
+  .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)}
+  .grid{display:grid;grid-template-columns:380px 1fr;gap:18px}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 12px;font-weight:600}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+  select,input[type=text],textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font:inherit;color:var(--ink)}
+  textarea{min-height:72px;resize:vertical}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .btn{appearance:none;border:0;border-radius:12px;padding:12px 18px;font:inherit;font-weight:600;cursor:pointer;background:var(--chip);color:var(--ink);transition:.15s}
+  .btn:hover{filter:brightness(.97)} .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.rec{background:var(--bad);color:#fff;width:100%;padding:16px;font-size:16px;border-radius:14px}
+  .btn.rec.on{background:#1d1d1f;animation:pulse 1.2s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,59,48,.45)}50%{box-shadow:0 0 0 12px rgba(255,59,48,0)}}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+  canvas#meter{width:100%;height:48px;border-radius:10px;background:var(--chip);display:block;margin-top:10px}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  .addr{font-size:22px;font-weight:600;letter-spacing:-.01em;line-height:1.35;margin:6px 0 10px;word-break:break-all}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;vertical-align:middle}
+  .badge.confident{background:var(--ok)} .badge.ambiguous,.badge.partial{background:var(--warn)} .badge.reject,.badge.empty{background:var(--bad)} .badge.baseline{background:var(--muted)}
+  .unv{background:#fff4e5;border-bottom:2px dotted var(--warn)}
+  .zone{border-radius:12px;padding:14px 16px}
+  .zone.raw{background:var(--chip)}
+  .zone.ours{background:#eef6ff;border:1px solid #cfe3fb}
+  .zone h2{margin-bottom:6px}
+  .zone .addr{font-size:19px;margin:4px 0 8px}
+  .seg{font-size:17px;line-height:1.9;margin:8px 0 4px;word-break:break-all}
+  .seg .hit{color:var(--ink);font-weight:600}
+  .seg .tail{color:var(--ink)}
+  .seg .inserted{color:var(--accent);font-weight:600}
+  .seg .unverified{background:#fff4e5;border-bottom:2px dotted var(--warn);color:var(--ink)}
+  .seg .filler,.seg .ref,.seg .dropped{color:#b0b0b5}
+  .seg .ref,.seg .dropped{text-decoration:line-through}
+  .legend{font-size:11px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  td,th{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{color:var(--muted);font-weight:500;width:34%}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:600px){.two{grid-template-columns:1fr}}
+  .box{background:var(--chip);border-radius:12px;padding:12px 14px;font-size:14px}
+  .box .k{font-size:12px;color:var(--muted);margin-bottom:4px}
+  .mono{font-family:var(--mono);font-size:13px}
+  .nb{display:flex;flex-direction:column;gap:8px}
+  .nb .it{display:grid;grid-template-columns:1fr 120px 58px;gap:10px;align-items:center;font-size:14px}
+  .bar{height:8px;border-radius:4px;background:var(--chip);overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--accent)}
+  .sub{font-size:12px;color:var(--muted)}
+  details{margin-top:10px} summary{cursor:pointer;color:var(--accent);font-size:13px}
+  pre{background:var(--chip);border-radius:10px;padding:10px 12px;font:12px/1.5 var(--mono);overflow:auto;max-height:320px;white-space:pre-wrap}
+  .hist{display:flex;flex-direction:column;gap:8px}
+  .hist .h{display:grid;grid-template-columns:64px 1fr auto;gap:10px;font-size:13px;padding:8px 10px;border-radius:10px;background:var(--chip);cursor:pointer}
+  .hist .h:hover{filter:brightness(.97)}
+  .err{color:var(--bad);font-size:13px;white-space:pre-wrap}
+  .kv{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+  .empty{color:var(--muted);font-size:14px;padding:20px 0;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>方言地址识别<small>Qwen3-ASR-1.7B · 两遍解码 + 方言音系检索</small></h1>
+    <div class="pill"><span class="dot" id="dot"></span><span id="status">连接中…</span></div>
+  </header>
+
+  <div class="grid">
+    <!-- 左：输入 -->
+    <div>
+      <div class="card">
+        <h2>录音</h2>
+        <label>方言（影响音系空间选择；自动＝由模型判别）</label>
+        <select id="dialect"><option value="">自动识别</option></select>
+        <div class="row" style="margin-top:12px;justify-content:space-between">
+          <label class="toggle" style="margin:0"><input type="checkbox" id="twopass" checked> 第二遍上下文注入解码</label>
+        </div>
+        <label>输入设备 <button class="btn" id="refreshdev" style="padding:2px 8px;font-size:12px;margin-left:6px">刷新</button></label>
+        <select id="device"><option value="">系统默认</option></select>
+        <button class="btn rec" id="rec" disabled>● 按一下开始录音</button>
+        <canvas id="meter"></canvas>
+        <div class="hint" id="level" style="font-family:var(--mono)">电平 —</div>
+        <div class="hint" id="rechint">说一句带地址的话，再按一下结束。录音在浏览器里编成 16kHz WAV 直传，不经第三方。</div>
+        <div class="hint err" id="silence" hidden></div>
+        <div class="row" style="margin-top:12px">
+          <input type="file" id="file" accept="audio/*" style="display:none">
+          <button class="btn" id="upload">上传音频文件</button>
+          <button class="btn" id="replay" disabled>回放上一段</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>文本直测（跳过 ASR）</h2>
+        <textarea id="text" placeholder="例：我屋头在成都市五后区红排楼街道二环路南四段三十号"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="runtext">只跑后处理</button>
+          <span class="hint" style="margin:0">用来演示：把 ASR 的误识文本喂进去，看检索+排序能不能救回来</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>本次会话历史</h2>
+        <div class="hist" id="hist"><div class="empty">还没有结果</div></div>
+      </div>
+    </div>
+
+    <!-- 右：结果 -->
+    <div>
+      <div class="card" id="result">
+        <h2>结果</h2>
+        <div class="empty">录一段，或在左侧输入文本。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ------------------------------------------------------------------ 状态
+const $ = s => document.querySelector(s);
+let status = null, lastWav = null, history = [];
+
+async function poll(){
+  try{
+    const r = await fetch('/api/status'); status = await r.json();
+    const dot = $('#dot'), st = $('#status');
+    if (status.no_model){ dot.className='dot'; st.textContent='未加载模型（仅文本链路）'; $('#rec').disabled=true; }
+    else if (status.model_ready){ dot.className='dot ok'; st.textContent=`模型就绪 · ${status.device} · 加载 ${status.load_time}s`; $('#rec').disabled=false; }
+    else if (status.model_error){ dot.className='dot bad'; st.textContent='模型加载失败：'+status.model_error.slice(0,80); }
+    else { dot.className='dot'; st.textContent='模型加载中…（4.7GB，首次约 1 分钟）'; setTimeout(poll, 2000); }
+    fillDialects(status.dialect_families);
+  }catch(e){ $('#status').textContent='服务未连接'; $('#dot').className='dot bad'; setTimeout(poll, 3000); }
+}
+let dialectsFilled=false;
+function fillDialects(fam){
+  if (dialectsFilled || !fam) return; dialectsFilled=true;
+  const sel = $('#dialect');
+  for (const [f, list] of Object.entries(fam)){
+    const g = document.createElement('optgroup'); g.label = f;
+    for (const d of list){ const o=document.createElement('option'); o.value=d; o.textContent=d; g.appendChild(o); }
+    sel.appendChild(g);
+  }
+}
+poll();
+
+// ------------------------------------------------------------------ 录音 → WAV
+// 用 Web Audio 直接抓 PCM，在浏览器里编成 16kHz 16bit WAV。
+// 不用 MediaRecorder：它产出 webm/opus，服务端解码要 ffmpeg，白添依赖。
+let ctx, src, proc, sink, stream, chunks=[], recording=false, inRate=48000, peakAll=0, sumSq=0, nSamp=0;
+const meter = $('#meter'), mctx = meter.getContext('2d');
+const SILENCE_RMS = 0.003;   // 正常说话 RMS 通常 0.02~0.3；全零/未授权的流是 0.000
+
+// 输入设备列表：授权前浏览器不给设备名，所以第一次录完再刷新一次才有名字
+// 虚拟/回环设备上没有麦克风，录出来永远是零。BlackHole 装了之后常被设成系统默认输入，
+// 于是"系统默认"就跟着掉进坑里——所以默认项要主动跳过它们，选第一个真实设备。
+const VIRTUAL_RE = /blackhole|virtual|loopback|soundflower|aggregate|多输出|聚合|ishowu|obs|zoomaudio|teams/i;
+const isVirtual = label => VIRTUAL_RE.test(label||'');
+let devicesAutoPicked = false;
+async function listDevices(){
+  try{
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audioinput');
+    const sel = $('#device'), cur = sel.value; sel.innerHTML = '<option value="">系统默认</option>';
+    devs.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId; o.textContent=(d.label||`输入设备 ${i+1}（未授权，无名称）`)+(isVirtual(d.label)?'  ⚠ 虚拟设备，无麦克风':''); sel.appendChild(o); });
+    // 只在拿到设备名之后自动选一次：优先真实麦克风（内建/MacBook/Microphone/麦克风），避开虚拟设备
+    if (!devicesAutoPicked && devs.some(d=>d.label)){
+      const real = devs.filter(d=>d.label && !isVirtual(d.label));
+      const pref = real.find(d=>/macbook|built-in|内建|internal|microphone|麦克风/i.test(d.label)) || real[0];
+      if (pref){ sel.value = pref.deviceId; devicesAutoPicked = true; $('#rechint').textContent = `已自动选择「${pref.label}」。如系统默认是 BlackHole 之类的虚拟设备，请勿选"系统默认"。`; }
+    } else { sel.value = cur; }
+  }catch(e){}
+}
+$('#refreshdev').onclick = listDevices;
+// 页面加载时预热一次麦克风权限：授权前 enumerateDevices 不给设备名，
+// 没有名字就无法识别哪个是虚拟设备。拿到权限立刻释放，不占用麦克风。
+(async () => {
+  try{ const s = await navigator.mediaDevices.getUserMedia({audio:true}); s.getTracks().forEach(t=>t.stop()); }catch(e){}
+  listDevices();
+})();
+
+async function startRec(){
+  $('#silence').hidden = true;
+  const devId = $('#device').value;
+  const audio = {channelCount:1, echoCancellation:true, noiseSuppression:true};
+  if (devId) audio.deviceId = {exact: devId};
+  stream = await navigator.mediaDevices.getUserMedia({audio});
+  let track = stream.getAudioTracks()[0];
+  // 拿到的如果是虚拟设备（BlackHole 之类），当场换成真实麦克风重新申请——
+  // 不让用户录完 5 秒零信号之后才发现。
+  if (isVirtual(track.label) && !devId){
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audioinput' && d.label && !isVirtual(d.label));
+    const pref = devs.find(d=>/macbook|built-in|内建|internal|microphone|麦克风/i.test(d.label)) || devs[0];
+    if (pref){
+      stream.getTracks().forEach(t=>t.stop());
+      stream = await navigator.mediaDevices.getUserMedia({audio:{...audio, deviceId:{exact:pref.deviceId}}});
+      track = stream.getAudioTracks()[0];
+      $('#device').value = pref.deviceId;
+      $('#rechint').textContent = `系统给的是虚拟设备，已自动切换到「${track.label}」。`;
+    }
+  }
+  ctx = new (window.AudioContext||window.webkitAudioContext)();
+  if (ctx.state==='suspended') await ctx.resume();
+  inRate = ctx.sampleRate;
+  src = ctx.createMediaStreamSource(stream);
+  proc = ctx.createScriptProcessor(4096, 1, 1);
+  // ScriptProcessor 必须接到 destination 才会被驱动；中间垫一个 0 增益节点，
+  // 否则麦克风会直接回放到扬声器形成啸叫。
+  sink = ctx.createGain(); sink.gain.value = 0;
+  chunks = []; peakAll = 0; sumSq = 0; nSamp = 0;
+  proc.onaudioprocess = e => {
+    if(!recording) return;
+    const d = e.inputBuffer.getChannelData(0);
+    chunks.push(new Float32Array(d));
+    let pk=0, ss=0; for(let i=0;i<d.length;i++){ const a=Math.abs(d[i]); if(a>pk) pk=a; ss+=d[i]*d[i]; }
+    peakAll = Math.max(peakAll, pk); sumSq += ss; nSamp += d.length;
+    const rms = Math.sqrt(sumSq/nSamp);
+    $('#level').textContent = `电平 RMS ${rms.toFixed(3)} · 峰值 ${peakAll.toFixed(2)} · 已录 ${(nSamp/inRate).toFixed(1)}s · ${inRate}Hz · ${track.label||'（设备名未知）'}${track.muted?' · 音轨被静音!':''}`;
+    drawMeter(d);
+  };
+  src.connect(proc); proc.connect(sink); sink.connect(ctx.destination);
+  // 第二路：MediaRecorder 同时录一份压缩音频（Chrome→webm/opus，Safari→mp4/aac）。
+  // Web Audio 的 ScriptProcessor 在某些浏览器/设备组合下会给全零流，
+  // 两路并行，停止时哪路有声用哪路，不把命押在单一采集路径上。
+  mrChunks = []; mr = null;
+  try{
+    const mime = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'].find(m=>window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+    mr = new MediaRecorder(stream, mime ? {mimeType: mime} : undefined);
+    mr.ondataavailable = e => { if (e.data && e.data.size) mrChunks.push(e.data); };
+    mr.start(250);
+  }catch(e){ mr = null; }
+  recording = true;
+  $('#rec').textContent='■ 录音中… 再按一下结束'; $('#rec').classList.add('on');
+  listDevices();   // 授权后设备名才可见
+}
+let mr = null, mrChunks = [];
+async function stopRec(){
+  recording=false;
+  let mrBlob = null;
+  if (mr && mr.state !== 'inactive'){
+    await new Promise(res => { mr.onstop = res; try{ mr.stop(); }catch(e){ res(); } });
+    if (mrChunks.length) mrBlob = new Blob(mrChunks, {type: mr.mimeType || 'audio/webm'});
+  }
+  try{ proc.disconnect(); src.disconnect(); sink.disconnect(); stream.getTracks().forEach(t=>t.stop()); ctx.close(); }catch(e){}
+  $('#rec').textContent='● 按一下开始录音'; $('#rec').classList.remove('on');
+  const pcm = concat(chunks); const ds = downsample(pcm, inRate, 16000);
+  const wav = encodeWav(ds, 16000);
+  mctx.clearRect(0,0,meter.width,meter.height);
+  const rms = nSamp ? Math.sqrt(sumSq/nSamp) : 0;
+  const secs = (ds.length/16000).toFixed(1);
+  if (rms >= SILENCE_RMS){
+    lastWav = wav; $('#replay').disabled=false;
+    return send(wav, `录音 ${secs}s · RMS ${rms.toFixed(3)}`);
+  }
+  // PCM 路是静音 → 试第二路。压缩音频哪怕是静音也有几 KB 头，所以用一个偏大的门槛
+  if (mrBlob && mrBlob.size > 8000){
+    lastWav = mrBlob; $('#replay').disabled=false;
+    $('#silence').hidden = false;
+    $('#silence').innerHTML = `Web Audio 路拿到的是静音（RMS ${rms.toFixed(4)}），已改用 MediaRecorder 那一路（${mrBlob.type}，${(mrBlob.size/1024).toFixed(0)}KB）上传。如果这条也是静音，服务端会明确报出来。`;
+    return send(mrBlob, `录音 ${secs}s · MediaRecorder 回退`);
+  }
+  $('#silence').hidden = false;
+  $('#silence').innerHTML = `两路采集都是<b>静音</b>（RMS ${rms.toFixed(4)}，峰值 ${peakAll.toFixed(3)}，${secs}s）。浏览器拿到了一条全零的音轨，通常是：<br>
+    ① 上面「输入设备」选到了没信号的设备——换一个试，或去 系统设置 → 声音 → 输入 看哪个有电平跳动；<br>
+    ② macOS <b>系统设置 → 隐私与安全性 → 麦克风</b> 没有勾选当前浏览器（勾选后要<b>重启浏览器</b>）；<br>
+    ③ 地址栏左侧的麦克风图标被设成"阻止"。<br>
+    修好后重录；或先用下方「文本直测」验证后半段。`;
+}
+$('#rec').onclick = () => recording ? stopRec() : startRec().catch(e=>alert('无法打开麦克风：'+e.name+' — '+e.message+'\n（需要 localhost 或 https；NotAllowedError = 浏览器或系统未授权）'));
+function concat(arrs){ let n=0; for(const a of arrs) n+=a.length; const out=new Float32Array(n); let o=0; for(const a of arrs){ out.set(a,o); o+=a.length; } return out; }
+function downsample(buf, from, to){
+  if (from===to) return buf;
+  const ratio = from/to, n = Math.round(buf.length/ratio), out = new Float32Array(n);
+  let o=0, i=0;
+  while (o<n){ const next=Math.round((o+1)*ratio); let s=0,c=0; for(; i<next && i<buf.length; i++){ s+=buf[i]; c++; } out[o++]= c? s/c : 0; }
+  return out;
+}
+function encodeWav(samples, rate){
+  const buf = new ArrayBuffer(44 + samples.length*2), v = new DataView(buf);
+  const W=(o,s)=>{for(let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i));};
+  W(0,'RIFF'); v.setUint32(4,36+samples.length*2,true); W(8,'WAVE'); W(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true); v.setUint32(24,rate,true);
+  v.setUint32(28,rate*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); W(36,'data'); v.setUint32(40,samples.length*2,true);
+  let o=44; for(let i=0;i<samples.length;i++,o+=2){ const s=Math.max(-1,Math.min(1,samples[i])); v.setInt16(o, s<0? s*0x8000 : s*0x7FFF, true); }
+  return new Blob([buf],{type:'audio/wav'});
+}
+function drawMeter(data){
+  const w=meter.width=meter.clientWidth*devicePixelRatio, h=meter.height=meter.clientHeight*devicePixelRatio;
+  mctx.clearRect(0,0,w,h); mctx.fillStyle='#0071e3';
+  const step=Math.max(1,Math.floor(data.length/(w/3)));
+  for(let x=0,i=0;i<data.length;i+=step,x+=3){ const a=Math.abs(data[i])*h*1.6; mctx.fillRect(x,(h-a)/2,2,Math.max(2,a)); }
+}
+$('#replay').onclick = () => { if(lastWav) new Audio(URL.createObjectURL(lastWav)).play(); };
+$('#upload').onclick = () => $('#file').click();
+$('#file').onchange = async e => { const f=e.target.files[0]; if(!f) return; lastWav=f; $('#replay').disabled=false; send(f, '文件 '+f.name); };
+
+// ------------------------------------------------------------------ 请求
+async function send(blob, label){
+  const d=$('#dialect').value, tp=$('#twopass').checked?1:0;
+  renderLoading(label);
+  try{
+    const r = await fetch(`/api/transcribe?dialect=${encodeURIComponent(d)}&two_pass=${tp}`, {method:'POST', headers:{'Content-Type': blob.type || 'audio/wav'}, body: blob});
+    const j = await r.json();
+    if (j.error) return renderError(j);
+    j._label = label; render(j); pushHist(j);
+  }catch(e){ renderError({error:String(e)}); }
+}
+$('#runtext').onclick = async () => {
+  const t=$('#text').value.trim(); if(!t) return;
+  renderLoading('文本');
+  const r = await fetch('/api/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t, dialect:$('#dialect').value})});
+  const j = await r.json(); if (j.error) return renderError(j);
+  j._label='文本'; render(j); pushHist(j);
+};
+
+// ------------------------------------------------------------------ 渲染
+const esc = s => String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function renderLoading(label){ $('#result').innerHTML = `<h2>结果</h2><div class="empty">处理中… ${esc(label)}</div>`; }
+function renderError(j){ $('#result').innerHTML = `<h2>结果</h2><div class="err">${esc(j.error)}\n${esc(j.model_error||'')}</div>${j.trace?`<details><summary>堆栈</summary><pre>${esc(j.trace)}</pre></details>`:''}`; }
+
+function render(j){
+  const f = j.fields||{};
+  const fieldRows = [['省',f.province],['市',f.city],['区',f.district],['路/街道',f.road],['小区/地标',f.community],['⚠ 未经地址库核验（原样保留）',f.unverified],['门牌',f.house_no],['楼栋',f.building],['单元',f.unit],['楼层',f.floor],['室',f.room]]
+    .filter(([,v])=>v).map(([k,v])=>`<tr><th>${k}</th><td>${k.startsWith('⚠')?`<span class="unv">${esc(v)}</span>`:esc(v)}</td></tr>`).join('');
+  // 地址串里把未核验段高亮：这些字是 ASR 原文，地址库没能证实也没能纠正
+  let addrHtml = esc(j.address||'');
+  for (const u of String(f.unverified||'').split('、').filter(Boolean)) addrHtml = addrHtml.replace(esc(u), `<span class="unv">${esc(u)}</span>`);
+  const p1=j.pass1, p2=j.pass2;
+  const passBox = (p, title) => p ? `<div class="box"><div class="k">${title}${p.asr_language?` · 模型判别：<b>${esc(p.asr_language)}</b>`:''}${p.asr_elapsed!=null?` · ${p.asr_elapsed}s`:''}${p.context_used?' · <b>已注入上下文</b>':''}</div>
+      <div>${esc(p.raw_text)||'<span class="sub">（空）</span>'}</div>
+      ${p.lex_subs&&p.lex_subs.length?`<div class="sub" style="margin-top:6px">方言词归一：${p.lex_subs.map(s=>`${esc(s.src)}→${esc(s.dst)||'∅'}`).join('，')}</div>`:''}
+      <div class="sub">归一后：${esc(p.norm_text)}</div>
+      <div class="sub">决策：<span class="badge ${p.decision}">${p.decision}</span> <span class="sub">${esc(p.reason)}</span></div></div>` : '';
+  const nb = (p1&&p1.nbest||[]).length ? (j.chosen==='pass2'&&p2 ? p2.nbest : p1.nbest) : [];
+  const nbest = nb.map((c,i)=>`<div class="it"><div>${i===0?'★ ':''}${esc(c.name)}<div class="sub">sim ${c.sim} · 覆盖 ${c.coverage} · 先验 ${c.prior} · 深度 ${c.depth}${c.conflict?` · 冲突 ${c.conflict}`:''}</div></div><div class="bar"><i style="width:${Math.round(c.total*100)}%"></i></div><div class="mono">${c.total}</div></div>`).join('');
+  const hits = nb[0] ? nb[0].hits.map(h=>`${h.level.padEnd(9)} ${h.name}  ← 命中「${h.matched}」 距离 ${h.dist}`).join('\n') : '';
+  // 逐段标注：原文每个字都显示，按去向着色——进地址/补插/未核验/闲话/参照/落选
+  const segs = j.segments||[];
+  const segHtml = segs.length ? `<div class="legend"><span><i style="background:#1d1d1f"></i>进地址</span><span><i style="background:#0071e3"></i>补插的上级行政区</span><span><i style="background:#ff9f0a"></i>库里没有·原样保留</span><span><i style="background:#b0b0b5"></i>非地址·灰</span><span><i style="background:#b0b0b5;text-decoration:line-through"></i>参照地标/落选·删除</span></div>
+    <div class="seg">${segs.map(s=>`<span class="${s.kind}" title="${esc(s.kind)}${s.orig&&s.orig!==s.text?' · 原文「'+esc(s.orig)+'」':''}">${esc(s.text)}</span>`).join('')}</div>` : '';
+  const decisionZh = {confident:'可信', ambiguous:'歧义·需确认', partial:'部分核验', reject:'不采信', empty:'无内容', baseline:'基线'}[j.decision] || j.decision;
+  // 最上方分两栏对照：
+  //   左「原始模型」= 第 1 遍裸转写：messages 里只有音频，无 system prompt、无语种强制、不连地址库
+  //   右「改造后」  = 本方案输出：地址 + 决策 + 字段
+  // 其余一切（转写标注、两遍原文、候选打分、录音元信息）收进「详情」。
+  const rawText = p1 ? (p1.raw_text || '') : '';
+  const isText = !p1 || p1.asr_language === undefined || p1.asr_language === null && !j.saved_as;
+  $('#result').innerHTML = `
+    <div class="two">
+      <div class="zone raw">
+        <h2>原始模型 <span class="sub">Qwen3-ASR-1.7B 裸输出 · 无提示词 · 不连地址库</span></h2>
+        <div class="addr" style="font-weight:500;color:#3a3a3c">${esc(rawText)||'<span class="sub">（空）</span>'}</div>
+        <div class="sub">${isText?'文本模式：输入即原文':`模型判别语种：<b>${esc(p1.asr_language||'—')}</b> · ${p1.asr_elapsed!=null?p1.asr_elapsed+'s':''}`}</div>
+      </div>
+      <div class="zone ours">
+        <h2>改造后 <span class="sub">方言音系检索 · 两遍解码 · 结构化</span></h2>
+        <div class="addr">${addrHtml||'<span class="sub">（无可信结果）</span>'}</div>
+        <div><span class="badge ${j.decision}">${decisionZh}</span></div>
+        ${j.decision==='ambiguous'?`<div class="box" style="margin-top:10px;border:1px solid var(--warn)"><div class="k">两个候选分不开，请确认：</div>${(j.nbest||[]).slice(0,3).map(esc).join('　|　')}</div>`:''}
+      </div>
+    </div>
+    <table style="margin-top:14px">${fieldRows||'<tr><td class="sub">无字段</td></tr>'}</table>
+    <details style="margin-top:16px"><summary>详情 · 转写标注 / 两遍解码 / 候选打分 / 原始数据</summary>
+      <div class="sub" style="margin:10px 0 6px">${esc(j._label||'')}${j.saved_as?` · 已存 ${esc(j.saved_as)}`:''} · 采用 ${j.chosen} · 方言 ${esc(j.dialect||'未指定')}（${esc(j.family)}） · 音系 ${esc((p1||{}).space||'')} · 共 ${j.elapsed}s · ${esc(j.reason)}</div>
+      ${segHtml}
+      ${j.decision==='partial'?`<div class="sub" style="margin:4px 0 8px">橙色虚线段是地址库里没有的地名，按 ASR 原文保留，未做纠错。生产环境接 POI API 后这类段会被覆盖。</div>`:''}
+      <div class="two" style="margin-top:12px">${passBox(p1,'第 1 遍 · 裸转写')}${p2?passBox(p2,'第 2 遍 · 上下文注入'):`<div class="box"><div class="k">第 2 遍</div><span class="sub">${p1&&p1.asr_language===undefined?'文本模式不跑 ASR':'未执行（关闭了两遍解码，或第 1 遍无候选）'}</span></div>`}</div>
+      <div class="nb" style="margin-top:12px">${nbest||'<div class="sub">无候选</div>'}</div>
+      <details style="margin-top:8px"><summary>Top-1 命中明细</summary><pre>${esc(hits)||'—'}</pre></details>
+      <details><summary>原始 JSON</summary><pre>${esc(JSON.stringify(j,null,1))}</pre></details>
+    </details>`;
+}
+function pushHist(j){
+  history.unshift(j); if (history.length>30) history.pop();
+  $('#hist').innerHTML = history.map((h,i)=>`<div class="h" data-i="${i}"><span class="sub">${esc(h.dialect||'自动')}</span><span>${esc(h.address||h.pass1&&h.pass1.raw_text||'')}</span><span class="badge ${h.decision}">${h.decision}</span></div>`).join('');
+  $('#hist').querySelectorAll('.h').forEach(el=>el.onclick=()=>render(history[+el.dataset.i]));
+}
+</script>
+<!-- C2M_zhideTang -->
+</body>
+</html>

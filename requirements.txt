@@ -1,0 +1,27 @@
+# Python 3.10 ~ 3.12（推荐 3.12，本项目的实测环境）
+# 3.13+ 未验证：transformers>=5.13 与 torch 在 3.13/3.14 上的轮子供给还不稳定。
+#
+# torch 不在这里锁版本，因为不同平台装法不同，见 README 的安装章节：
+#   macOS (Apple Silicon)  pip install torch
+#   Windows / Linux + CUDA pip install torch --index-url https://download.pytorch.org/whl/cu124
+#   Windows / Linux 纯 CPU pip install torch          （PyPI 默认轮子就是 CPU 版）
+
+# ---- 纯文本链路（不下模型权重也能跑评测，最低门槛） ----
+pypinyin>=0.53,<1               # 普通话拼音 —— 官话系 12 种方言的音系空间；缺它整个匹配层起不来
+numpy>=1.26,<3
+
+# ---- 音频链路 ----
+torch>=2.4
+transformers>=5.13,<6           # 原生 Qwen3ASRForConditionalGeneration 从 5.13 起；实测 5.16.1
+accelerate>=0.30                # asr.py 用了 low_cpu_mem_usage=True
+safetensors>=0.4                # scripts/convert_to_hf.py 直接 import
+soundfile>=0.12                 # 读写 wav
+librosa>=0.10                   # 重采样；读 mp3
+                                # 注意：.m4a/.aac 需要系统装 ffmpeg，光有 librosa 解不了
+
+# ---- 方言音系扩展（可选：没装会自动降级到普通话近似，不影响主链路） ----
+pycantonese>=3.4                # 粤拼 —— 粤语（港/广）。未装时 romanize.py 降级并在 /api/status 标注
+taibun>=0.5                     # 台罗 —— 闽南语 / 福建
+
+# 不需要 qwen-asr 官方包：权重用 -hf 版直接加载，或经 scripts/convert_to_hf.py 转成原生布局。
+# 不需要 gradio：测试界面是标准库 http.server + 单文件 HTML。

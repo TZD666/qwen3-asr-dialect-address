@@ -1,0 +1,38 @@
+# ---- 模型权重（约 4.4~8.8 GB，超 GitHub 限制，按 README 自行下载） ----
+models/
+
+# ---- 虚拟环境 ----
+.venv/
+venv/
+env/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# ---- 评测报告：逐次运行产生的 json 是噪音；.md 报告保留在版本库里 ----
+eval/reports/*_text.json
+eval/reports/*_audio.json
+eval/reports/*_baseline.json
+
+# ---- 编辑器 / 系统 ----
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# ---- 个人材料：留在本地，不进公开仓 ----
+docs/面试*.md
+docs/*面试*.md
+docs/范本_*.md
+
+# ---- Claude Code / OMC 运行时状态 ----
+# 含本机用户名、家目录结构、会话 ID 与 API 花费，绝不能进公开仓。
+# 不写前导斜杠，以便匹配任意层级下的同名目录。
+.omc/
+.claude/
