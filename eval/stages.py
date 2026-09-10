@@ -199,16 +199,16 @@ def _syl_cer(hyp_syls, ref_syls, profile=None) -> float:
 def _best_substring(hyp: str, name: str) -> tuple[float, str]:
     """hyp 里与 name 字级最接近的等长（±1）窗口：(cer, 片段)。"""
     L = len(name)
-    best = (1.0, "")
+    best: tuple[float, str] | None = None
     for w in (L - 1, L, L + 1):
         if w < 1 or w > len(hyp):
             continue
         for s in range(len(hyp) - w + 1):
             seg = hyp[s:s + w]
             c = cer(seg, name)
-            if c < best[0]:
+            if best is None or c < best[0]:      # 无条件记录 argmin：全错也要给人看最近的那段
                 best = (c, seg)
-    return best
+    return best if best is not None else (1.0, "")
 
 
 def stage_a(hyp_text: str, transcript_gold: str, gold_names: list[str | list[str]], dialect: str | None) -> dict:
@@ -244,6 +244,9 @@ def stage_a(hyp_text: str, transcript_gold: str, gold_names: list[str | list[str
                 if bw:
                     seg_syls = hyp_syls[bw[1][0]:bw[1][1]]
                     d_phon01 = _syl_cer(seg_syls, space.romanizer(nm))
+                    # 给人看的"最近片段"用音上最近的窗口：字级全错时字级 argmin 只是随便一段
+                    if len(hyp_syls) == len(hyp_h):
+                        seg = hyp_h[bw[1][0]:bw[1][1]]
                 else:
                     d_phon01 = 1.0
                 cand = {"name": nm, "seg": seg, "cer_char": round(c_char, 3),
@@ -293,8 +296,9 @@ def stage_b(raw_text: str, lex_subs: list, pred_addr: str, pred_fields: dict, tr
     # 非法数串："八百一百八号" 必须原样保留、不得猜成数字
     illegal = [m.group(0) for m in _ILLEGAL_NUM.finditer(raw_text) if cn_to_int(m.group(1)) is None]
     r["illegal_present"] = bool(illegal)
-    r["illegal_number_caught"] = all(s in pred_addr or s in pred_fields.get("unverified", "") or
-                                     not re.search(r"\d+" + re.escape(s[-1]), pred_addr) for s in illegal)
+    # 非法串必须**原样留在输出里**（地址串或 unverified）。猜成数字是错，悄悄吞掉也是错——
+    # 908 号那次的教训是"门牌绝不猜"，但"绝不猜"不等于"可以丢"。
+    r["illegal_number_caught"] = all(s in pred_addr or s in pred_fields.get("unverified", "") for s in illegal)
     r["illegal_sequences"] = illegal
     # 闲话泄漏：transcript 里不属于规范地址的字，出现在了输出里
     out_text = pred_addr + pred_fields.get("unverified", "")
@@ -359,7 +363,7 @@ def stage_c(ranking: RankResult, gold: GoldChain, db: AddressDB, dialect: str | 
         r["recall_chain@all"] = pos is not None
         r["gold_rank"] = pos
         if pos is not None:
-            r["gold_chain_obj"] = full.nbest[pos - 1]
+            r["gold_chain_scores"] = chain_scores(full.nbest[pos - 1])   # 只存数字，结果可直接 json.dumps
     if not r["recall_chain@all"]:
         r["miss_reason"], r["miss_detail"] = _miss_reason(ranking, gold, db, dialect)
     r["ok"] = r["recall_chain@all"]
@@ -371,10 +375,16 @@ def stage_c(ranking: RankResult, gold: GoldChain, db: AddressDB, dialect: str | 
 # --------------------------------------------------------------------------
 
 
-def _terms(c: Chain) -> dict[str, float]:
+def chain_scores(c: Chain) -> dict:
+    """候选链的五项分数 + 总分 + 名字，纯数字，可序列化。"""
+    return {"name": c.full_name(), "sim": c.sim, "coverage": c.coverage, "prior": c.prior,
+            "depth": c.depth, "conflict": c.conflict, "total": c.total}
+
+
+def _terms(s: dict) -> dict[str, float]:
     # 权重从模块里现取：评测可能临时改权重做故意破坏测试
-    return {"sim": rank_mod.W_SIM * c.sim, "cov": rank_mod.W_COV * c.coverage, "prior": rank_mod.W_PRIOR * c.prior,
-            "depth": rank_mod.W_DEPTH * c.depth, "conflict": -rank_mod.W_CONFLICT * c.conflict}
+    return {"sim": rank_mod.W_SIM * s["sim"], "cov": rank_mod.W_COV * s["coverage"], "prior": rank_mod.W_PRIOR * s["prior"],
+            "depth": rank_mod.W_DEPTH * s["depth"], "conflict": -rank_mod.W_CONFLICT * s["conflict"]}
 
 
 def stage_d(ranking: RankResult, gold: GoldChain, c_res: dict) -> dict:
@@ -388,18 +398,19 @@ def stage_d(ranking: RankResult, gold: GoldChain, c_res: dict) -> dict:
     rank_pos = c_res.get("gold_rank")
     r["mrr"] = round(1.0 / rank_pos, 3) if rank_pos else 0.0
     if not r["top1_correct"]:
-        g = next((c for c in nb if chain_matches(c, gold)), None) or c_res.get("gold_chain_obj")
-        if g is not None:
-            tg, tt = _terms(g), _terms(top)
+        g = next((c for c in nb if chain_matches(c, gold)), None)
+        gs = chain_scores(g) if g is not None else c_res.get("gold_chain_scores")
+        if gs:
+            tg, tt = _terms(gs), _terms(chain_scores(top))
             delta = {k: round(tg[k] - tt[k], 4) for k in tg}
             # 真值链输在哪一项：差值最负的那项（绝对值最大且为负）
             losing = {k: v for k, v in delta.items() if v < 0}
             dom = min(losing, key=lambda k: losing[k]) if losing else max(delta, key=lambda k: abs(delta[k]))
             r["dominant_term"] = dom
             r["delta"] = delta
-            r["gold_chain"] = g.full_name()
+            r["gold_chain"] = gs["name"]
             r["top_chain"] = top.full_name()
-            r["gold_total"], r["top_total"] = round(g.total, 4), round(top.total, 4)
+            r["gold_total"], r["top_total"] = round(gs["total"], 4), round(top.total, 4)
     r["ok"] = r["top1_correct"]
     return r
 

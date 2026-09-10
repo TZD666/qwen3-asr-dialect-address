@@ -258,7 +258,6 @@ def evaluate(rec: dict, res, truth: dict, db: AddressDB, dialect: str | None, mo
     rec["stage_b"] = stage_b(final.raw_text, final.lex_subs, rec["pred"], rec["fields"], truth)
     c = stage_c(final.ranking, gold, db, dialect)
     d = stage_d(final.ranking, gold, c)
-    c.pop("gold_chain_obj", None)
     rec["stage_c"], rec["stage_d"] = c, d
     feats = replay_features(final.ranking)
     rec["replay"] = feats
@@ -659,6 +658,10 @@ def build_report(run: dict) -> str:
             L.append(f"\n当前阈值 ({rank_mod.MARGIN_MIN}, {rank_mod.SIM_MIN}) 所在点: coverage={cur['coverage']} risk={cur['risk']} "
                      f"(TP={cur['TP']} FA={cur['FA']} FR={cur['FR']} TR={cur['TR']})")
         L.append("单调性: " + ("通过" if not g["monotonic_violations"] else "违反 " + "; ".join(g["monotonic_violations"][:5])))
+        sims = [r["replay"]["top_sim"] for r in scored if r.get("replay") and not r["replay"].get("empty")]
+        if sims and min(sims) >= 0.999:
+            L.append("⚠ 所有样本 Top-1 音相似度均为 1.0（命中片段全部精确，Chain.sim 只对命中层求平均），"
+                     "SIM 轴平坦、SIM_MIN 闸门不可达；阈值建议只能从合成集或音频集的曲线上读。")
     cal = run.get("calibration") or {}
     if cal.get("n"):
         L += ["", f"校准（Chain.total 十桶，ECE={cal['ece']}，{cal['nonempty_buckets']}/10 桶有数据；calib 集为空，未做保序回归）：", "",
