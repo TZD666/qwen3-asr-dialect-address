@@ -22,12 +22,13 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .address_db import AddressDB
 from .asr import ASROutput, Qwen3ASR, normalize_dialect_label
 from .dialect_lexicon import normalize as lex_normalize
 from .normalize import TailFields, normalize as num_normalize
+from .pinyin_dialect import GENERIC, char_readings, syllable_distance, to_syllables
 from .rank import Chain, RankResult, rank
 
 _DECISION_RANK = {"confident": 4, "ambiguous": 3, "partial": 2, "reject": 1, "empty": 0}
@@ -83,10 +84,34 @@ class Result:
 # --------------------------------------------------------------------------
 
 
-def _postprocess(text: str, db: AddressDB, dialect: str | None, asr: ASROutput | None) -> PassResult:
-    lex_text, subs = lex_normalize(text)
+RankHook = Callable[[RankResult], RankResult]
+
+try:
+    import opencc as _opencc
+
+    _T2S = _opencc.OpenCC("t2s")
+except Exception:                      # opencc 是可选依赖：没装就不转，粤/闽的繁体输出走原样
+    _T2S = None
+
+
+def to_simplified(text: str) -> str:
+    """繁 → 简。粤语/闽南语录音模型会吐繁体（龍頭路八十九號），地址库和数字规则都是简体的，
+    不转的话"號"不认、"龍頭路"匹配不上。opencc 缺失时原样返回。"""
+    if _T2S is None or not text:
+        return text
+    return _T2S.convert(text)
+
+
+def _postprocess(
+    text: str, db: AddressDB, dialect: str | None, asr: ASROutput | None,
+    rank_hook: RankHook | None = None,
+) -> PassResult:
+    lex_text, subs = lex_normalize(to_simplified(text))
     norm_text, tail = num_normalize(lex_text)
     ranking = rank(tail.geo_text, db, dialect)
+    if rank_hook is not None:
+        # 评测用的挂钩：oracle 实验在这里把真值链强制换到 Top-1，其余环节不变
+        ranking = rank_hook(ranking)
     return PassResult(asr, text, lex_text, subs, norm_text, tail, ranking)
 
 
@@ -130,38 +155,80 @@ _FILLER_MULTI = ["那边的", "旁边的", "附近的", "对面的", "那栋楼"
                  "那个", "那边", "那儿", "那里", "这个", "这边", "这里", "旁边", "附近", "对面",
                  "楼上", "楼下", "院子里", "院子", "那栋", "那幢", "那座", "就是", "就在"]
 _FILLER_EDGE = "的里头上下在是"
-_PUNCT = re.compile(r"[。，,、！!？?；;：:\s「」『』()（）]+")
+_PUNCT = re.compile(r"[。，,、！!？?；;：:\s「」『』()（）“”‘’《》]+")
 # 整段只剩这些泛指名词时视为无信息（"那个巷巷头"→"巷子"）；有专名前缀的（宽窄巷子）不受影响
 _GENERIC_ONLY = {"巷子", "巷", "院子", "院坝", "楼", "房子", "房", "家", "家里", "屋", "屋里",
                  "那栋", "那幢", "小区", "街", "路", "门口", "门", "对门", "隔壁"}
 # 紧跟在命中片段之后的孤立类型后缀（"观音桥"匹配成"观音桥街道"之后剩下的"步行街"）
 _GENERIC_SUFFIX = {"街道", "步行街", "古镇", "广场", "大道", "路", "街", "巷", "小区", "花园",
                    "大厦", "商场", "中心", "镇", "村", "新区", "区", "市", "省", "机场", "火车站", "站"}
+# 地址里会出现的类型字：门牌以下都说完之后的自由文本，没有这些字的当结尾闲话
+_ADDR_FEATURE = re.compile(r"[路街巷道村镇号栋幢座楼苑园区厦场城店馆院寓库站港口湾桥门铺摊坊堂庄墅所局厂校湖山塔寺庙]")
+# 命中片段后紧跟的单字道路类型（"中街"+"路"）：并入名字而不是删掉
+_ROAD_TYPE_CHARS = "路街巷道"
+_TYPE_SUFFIX_BLOCK = ("路", "巷", "道", "段")     # 库名已经是完整道路名，后面的类型字不再并入
+# 结构助词/语气词：地址成分里不会有"的""嘅"，出现在门牌之后的段里就是在说话，不是在报地址
+_CHATTER = set("的嘅呢吧嘛哈呀哦啦咯喽啰哟嘞吗么呗")
+# 结尾闲话里常见的评价/口音词（"地道甘肃味儿"里的"道"会撞上地址特征字，得靠词来认）
+_CHATTER_WORDS = ("地道", "味儿", "味道", "正宗", "好吃", "巴适", "安逸", "真的", "腔", "话", "唠", "明明白白")
 
 
-def _clean_free(seg: str, is_lead: bool, after_hit: bool = False) -> str:
-    """清理一段未被地址库命中的文本：去标点、去口语填充，剩下的原样保留。"""
-    s = _PUNCT.sub("", seg)
-    if is_lead:
-        s = _LEAD_FILLER.sub("", s)
-    changed = True
-    while changed and s:
-        changed = False
+def _clean_free_pieces(seg: str, is_lead: bool, after_hit: bool = False, trailing: bool = False) -> list[str]:
+    """清理一段未被地址库命中的文本，返回保留下来的片段列表。
+
+    先按标点和多字口语填充切成小段，再逐段判断——"老火锅馆，巴适的板"是一段自由文本，
+    但逗号后面那半句是闲话，前半句是店名，不能一起留也不能一起删。
+    """
+    out: list[str] = []
+    pieces = [p for p in _PUNCT.split(seg) if p]
+    for i, p in enumerate(pieces):
+        s = p
+        if is_lead and i == 0:
+            s = _LEAD_FILLER.sub("", s)
+        # 多字填充当分隔符，切开后各自处理
         for w in _FILLER_MULTI:
-            if w in s:
-                s = s.replace(w, "")
-                changed = True
-        while s and s[0] in _FILLER_EDGE:
-            s = s[1:]
-            changed = True
-        while s and s[-1] in _FILLER_EDGE:
-            s = s[:-1]
-            changed = True
-    if s in _GENERIC_ONLY:
-        return ""
-    if after_hit and s in _GENERIC_SUFFIX:
-        return ""
-    return s
+            s = s.replace(w, "\x00")
+        for q in s.split("\x00"):
+            while q and q[0] in _FILLER_EDGE:
+                q = q[1:]
+            while q and q[-1] in _FILLER_EDGE:
+                q = q[:-1]
+            if not q or q in _GENERIC_ONLY:
+                continue
+            if after_hit and not out and q in _GENERIC_SUFFIX:
+                continue
+            if trailing and (not _ADDR_FEATURE.search(q) or any(c in _CHATTER for c in q)
+                             or any(w in q for w in _CHATTER_WORDS)):
+                continue
+            out.append(q)
+    return out
+
+
+def _clean_free(seg: str, is_lead: bool, after_hit: bool = False, trailing: bool = False) -> str:
+    return "".join(_clean_free_pieces(seg, is_lead, after_hit, trailing))
+
+
+def _absorbed_by_hit(piece: str, disp: str, side: str, max_dist: float = 0.30) -> bool:
+    """紧挨着命中片段的一小段自由文本，是不是命中名字被听错的开头/结尾。
+
+    "航空路一号称都双流机场"：库里 双流机场 是 成都双流国际机场 的别名，命中后输出全名，
+    前面剩下的"称都"和全名开头的"成都"同音——那是名字的一部分被听错了，不是另一个地名，
+    不能当未核验片段留着。只看 ≤3 个音节、且名字比它长的情形。
+    """
+    han = [c for c in piece if _HAN.match(c)]
+    ds = to_syllables(disp)
+    k = len(han)
+    if not (1 <= k <= 3) or k >= len(ds):
+        return False
+    ref = ds[:k] if side == "prefix" else ds[-k:]
+    # 碎片脱离了上下文，多音字取最像的那个读音（"都"在"曾都"里读 dou、在"成都"里读 du）
+    total = 0.0
+    for ch, r in zip(han, ref):
+        alts = char_readings(ch) or to_syllables(ch)
+        if not alts:
+            return False
+        total += min(syllable_distance(a, r, GENERIC) for a in alts)
+    return total / k <= max_dist
 
 
 def _assemble(
@@ -221,6 +288,11 @@ def _assemble(
                 continue
             e_ = h.entry
             disp = h.matched_name if (len(h.matched_name) > len(e_.name) and e_.name in h.matched_name) else e_.name
+            # 说话人在库名后面紧接着说了一个道路类型字（库里叫"中街"，人说"中街路"）：
+            # 那是名字的一部分，跟着输出，不当孤立后缀删掉。库名本身已带类型后缀的不动。
+            if ne < n and norm_text[ne] in _ROAD_TYPE_CHARS and not disp.endswith(_TYPE_SUFFIX_BLOCK) \
+                    and disp[-1] != norm_text[ne] and lv not in ADMIN and id(h) not in ref_ids:
+                disp, ne = disp + norm_text[ne], ne + 1
             # 行政区名出现在路名**之后**（"航空路1号成都双流机场"里的"成都"）：
             # 它是后面专名的一部分，不是在报行政区。原位删掉，行政区改为按层级前插。
             if lv in ADMIN and first_road_pos is not None and s > first_road_pos:
@@ -234,6 +306,9 @@ def _assemble(
         chain_codes = {x.adcode for x in chain.entries.values()}
         chain_levels = {lv for lv in ADMIN if lv in chain.hits}
         taken = [(ns, ne) for ns, ne, _, _ in edits]
+        # 竞争行政区只可能出现在地址的前半段：门牌一说完，后面的"珠海市"（"皮铺还是"撞出来的）
+        # 只是闲话里的巧合，删了会把店名的字一起削掉。
+        competitor_limit = min([s for s, _ in tail_spans] + [n])
         for h in (all_hits or []):
             # 只删"和本链同一层级正面竞争、且本链在该层级有真实命中"的强命中。
             # 弱命中（2 音节撞县名）不删；本链该层级没命中的也不删——那不是竞争，是本链不知道。
@@ -245,6 +320,8 @@ def _assemble(
             if s >= e or e > len(han_pos):
                 continue
             ns, ne = han_pos[s], han_pos[e - 1] + 1
+            if ns >= competitor_limit:
+                continue
             if any(not (ne <= a or ns >= b) for a, b in taken):
                 continue
             edits.append((ns, ne, "", "rejected"))
@@ -294,6 +371,8 @@ def _assemble(
     )
     first_content_seen = False
     prev_kind = ""
+    prev_level = ""
+    prev_text = ""
     seg_of_cleaned: list[int] = []     # cleaned[i] 对应 segments 里的下标，补插时用来定位
     for idx, (k, txt, lv, orig) in enumerate(parts):
         if k == "hit" and not txt:
@@ -305,12 +384,24 @@ def _assemble(
             if has_hit and idx < first_hit_idx:
                 segments.append({"kind": "filler", "text": orig})
                 continue
-            cleaned_txt = _clean_free(txt, is_lead=not first_content_seen, after_hit=(prev_kind == "hit"))
-            # 门牌以下都说完之后的自由文本，没有地名特征字的当结尾闲话
-            if cleaned_txt and idx > last_content_idx and last_content_idx >= 0 and not re.search(
-                r"[路街巷道村镇号栋幢座楼苑园区厦场城店馆院寓库站港口湾桥门]", cleaned_txt
-            ):
-                cleaned_txt = ""
+            # 夹在两个行政区命中之间的自由文本（"宁夏｜本地腔说｜银川市"）：
+            # 省和市之间不会有地名，只会有话。
+            nxt = next(((k2, l2) for k2, t2, l2, _ in parts[idx + 1:] if k2 != "free" and t2), None)
+            if prev_kind == "hit" and prev_level in ADMIN and nxt and nxt[0] == "hit" and nxt[1] in ADMIN:
+                segments.append({"kind": "filler", "text": orig})
+                continue
+            # 门牌以下都说完之后的自由文本：没有地名特征字、或带着"的/嘅"这类说话用字的当结尾闲话。
+            # 没有候选链（reject）时不做这个判断——那时的契约是原文保留，不能替说话人删字。
+            trailing = chain is not None and idx > last_content_idx >= 0
+            pieces = _clean_free_pieces(txt, is_lead=not first_content_seen, after_hit=(prev_kind == "hit"),
+                                        trailing=trailing)
+            # 被相邻命中"吸收"的碎片：命中名字的开头/结尾被听错后剩下的字（"称都"+成都双流国际机场）
+            nxt_part = next((p for p in parts[idx + 1:] if p[0] != "free" and p[1]), None)
+            if pieces and nxt_part and nxt_part[0] == "hit" and _absorbed_by_hit(pieces[-1], nxt_part[1], "prefix"):
+                pieces.pop()
+            if pieces and prev_kind == "hit" and prev_text and _absorbed_by_hit(pieces[0], prev_text, "suffix"):
+                pieces.pop(0)
+            cleaned_txt = "".join(pieces)
             if not cleaned_txt:
                 segments.append({"kind": "filler", "text": orig})
                 continue
@@ -320,7 +411,7 @@ def _assemble(
         else:
             segments.append({"kind": k, "text": txt, "orig": orig, "level": lv})
         first_content_seen = True
-        prev_kind = k
+        prev_kind, prev_level, prev_text = k, lv, txt
         cleaned.append((k, txt, lv))
         seg_of_cleaned.append(len(segments) - 1)
 
@@ -385,18 +476,22 @@ class Pipeline:
         asr: Qwen3ASR | None = None,
         two_pass: bool = True,
         context_topk: int = 8,
+        rank_hook: RankHook | None = None,
     ):
         self.db = db or AddressDB.default()
         self.asr = asr or Qwen3ASR()
         self.two_pass = two_pass
         self.context_topk = context_topk
+        self.rank_hook = rank_hook
 
     # ------------------------------------------------------------------
     def process_text(self, text: str, dialect: str | None = None) -> Result:
         """纯文本入口：跳过 ASR，用于离线测试和演示。"""
         t0 = time.time()
-        p1 = _postprocess(text, self.db, dialect, None)
-        address, fields, segs = _assemble(p1.ranking.top, p1.tail, p1.tail.geo_text, p1.norm_text, p1.ranking.all_hits)
+        p1 = _postprocess(text, self.db, dialect, None, self.rank_hook)
+        # 与 process() 同一条规则：reject 时不用候选链拼装，原文交出去
+        top = p1.ranking.top if p1.decision in ("confident", "ambiguous", "partial") else None
+        address, fields, segs = _assemble(top, p1.tail, p1.tail.geo_text, p1.norm_text, p1.ranking.all_hits)
         return Result(
             audio="(text)", dialect=dialect, pass1=p1, pass2=None, final=p1, chosen="pass1",
             address=address, fields=fields, segments=segs,
@@ -410,7 +505,7 @@ class Pipeline:
         # ---- 第 1 遍：裸转写 ----
         a1 = self.asr.transcribe(audio, language=language)
         dialect = normalize_dialect_label(a1.language) or dialect_hint
-        p1 = _postprocess(a1.text, self.db, dialect, a1)
+        p1 = _postprocess(a1.text, self.db, dialect, a1, self.rank_hook)
 
         # ---- 第 2 遍：上下文注入 ----
         p2: PassResult | None = None
@@ -422,7 +517,7 @@ class Pipeline:
                     ctx.append(self.db.full_name(x.entry))
             a2 = self.asr.transcribe(audio, language=language, context=ctx)
             if a2.context_used:
-                p2 = _postprocess(a2.text, self.db, dialect, a2)
+                p2 = _postprocess(a2.text, self.db, dialect, a2, self.rank_hook)
 
         # ---- 择优 ----
         if p2 is not None and _better(p1, p2):

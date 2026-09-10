@@ -151,12 +151,17 @@ python demo/server.py --port 8851 --host 0.0.0.0   # 换端口 / 允许局域网
 ## 命令行评测
 
 ```bash
-python eval/run_eval.py --mode text        # 朗读稿当完美识别，只测后处理，不需要权重
-python eval/run_eval.py --mode baseline    # 裸模型对照组，需要音频
-python eval/run_eval.py --mode audio       # 完整流水线
+python eval/run_eval.py --mode text                      # 朗读稿当完美识别，只测后处理，不需要权重
+python eval/run_eval.py --mode text --negatives oov      # 库缺负样本：临时删 10 条库条目，看会不会过度纠正
+python eval/run_eval.py --mode text --oracle all         # 库完备 / 排序完美 / 闸门完美 各能推到多少
+python eval/run_eval.py --mode text --eval data/eval/synthetic/perturbed.jsonl --tag synthetic   # 720 条合成扰动
+python eval/run_eval.py --mode audio                     # 按 data/eval/manifest.jsonl 跑全部录音，配对 baseline
+python eval/regression.py                                # 无模型回归：与 eval/golden 逐分片比，退化即失败
 ```
 
-评测不只报字错率。`201室` 错成 `202室` 只差一个字符但快递彻底送错门，所以主指标是字段级精确匹配，按 11 个难点维度分层，另报错误严重性分级。
+评测不只报一个总分。每条样本按六个阶段分别打分（裸 ASR、归一化、召回、排序、闸门、补全），端到端错的样本用决策树贴**一个**归因标签（库缺 / 声学不可恢复 / 归一化错 / 召回漏 / 排错 / 闸门放行 / 闸门误拦 / 补全错），报告按方言、地址深度、口语噪声、难点、负样本类型分片，百分比一律带 Wilson 区间，n < 20 只报 k/n。三类负样本（库缺、ASR 已对、注入带偏）和三个 oracle 开关分别回答"改坏率多少"和"每个环节的天花板多高"。完整设计见 [评测体系设计.md](评测体系设计.md)，实施与调优结果见 [docs/方案推演.md](docs/方案推演.md) 第 16 节。
+
+`201室` 错成 `202室` 只差一个字符但快递彻底送错门，所以端到端主指标仍是字段级精确匹配，另有与损失对齐的决策四格：错送率（confident 却错）对自动通过率。
 
 ## 工作原理
 
@@ -189,8 +194,9 @@ python eval/run_eval.py --mode audio       # 完整流水线
 - **路级地址库只有 347 条**，是为跑通流程精选的样本。省市区三级是全国全量 3214 条，但街道、道路、小区是开放集，百万量级且持续变化，生产环境必须接高德或百度 POI 接口（代码已留接口）。实测吃过亏：贵阳「中华中路」被系统改成了「中华北路」，因为库里只有北路和南路。正确答案不在候选集里的时候，排序算法救不了。
 - **粤拼路径没有端到端验证。** 依赖可选包 `pycantonese`，作者机器上因网络问题装不上，粤语实际走的是「普通话拼音·粤语近似」降级路径。降级机制本身可用，`/api/status` 会报出原因。台罗（闽南语）已装并验证。
 - **吴语、浙江、湘、赣没有成熟罗马化库**，只能用普通话近似，信号较弱。
-- **真实录音的成套评测还没做。** 仓库里 43 条有效录音没有对齐标注，只能当案例，不能当指标。EM 100% 那个数字来自文本模式，用朗读稿当完美识别输入。
-- **打分函数的五个权重是手设的**，不是拟合出来的，总分也没有做概率校准。
+- **真实录音的标注还是草稿。** 45 条可用录音已进 `data/eval/manifest.jsonl`，但其中 32 条的逐字稿和规范地址是按 ASR 输出加文档记载预填的草稿，8 条听不清的留空，只有 5 条 TTS 是确认过的。说话人本人过目、把 `label_status` 改成 `confirmed` 之前，音频模式的数字只能看趋势，不能对外报。EM 100% 那个数字来自文本模式，用朗读稿当完美识别输入。
+- **样本量撑不起置信区间。** 24 句朗读稿 + 33 条有标注录音，任何分片都不到 150 条，报告里每个百分比旁边的 Wilson 区间都很宽；样本缺口表（报告第 1 节）列了哪个格子还差多少。
+- **打分函数的五个权重是手设的**，不是拟合出来的，总分也没有做概率校准。校准集和权重学习集在样本量达门槛（300 / 500）前为空，报告里写"未达门槛"。
 
 ## 常见问题
 
@@ -215,8 +221,16 @@ src/dialect_addr/
   asr.py              Qwen3-ASR 封装，两遍解码
   pipeline.py         端到端编排，保留每一步中间结果
 demo/                 标准库 HTTP 服务 + 单文件 HTML 测试界面
-eval/run_eval.py      字段级评测，text / baseline / audio 三模式
-scripts/              权重校验、格式转换、地址库构建
+eval/
+  run_eval.py         分阶段评测：text / baseline / audio，负样本、oracle、阈值网格、配对统计
+  stages.py           六个阶段的打分函数（纯函数）
+  attribution.py      错误归因决策树
+  regression.py       无模型回归套件，与 eval/golden 快照逐分片比
+  check_manifest.py   录音清单与评测集 schema 校验
+  asr_cache.py        ASR 结果磁盘缓存（同一段音频只让模型跑一次）
+scripts/              权重校验、格式转换、地址库构建、清单生成、合成扰动集生成
 data/                 地址库与测试数据，来源标注见 data/README.md
-docs/方案推演.md       完整的方案推导过程
+docs/方案推演.md       完整的方案推导过程与评测调优结果
+评测体系设计.md        评测体系 v2 设计（分阶段、分片、负样本、oracle）
+.github/workflows/    CI：库 / 代价矩阵 / 权重 / 拼装任一改动都跑无模型回归
 ```

@@ -2,7 +2,12 @@
   "_meta": {
     "name": "西南官话地址识别评测集 v1",
     "dialect_group": "西南官话",
-    "sub_dialects": ["成都话", "重庆话", "贵阳话", "昆明话"],
+    "sub_dialects": [
+      "成都话",
+      "重庆话",
+      "贵阳话",
+      "昆明话"
+    ],
     "created": "2026-09-09",
     "note": "口语文本为待朗读稿；ground_truth 为规范化后的标准地址；fields 为结构化字段标注。难点维度见 difficulty 标签，评测时按标签分层统计，不要只看全局平均值。",
     "difficulty_legend": {
@@ -26,12 +31,32 @@
       "spoken": "我屋头在成都市武侯区红牌楼街道二环路南四段三十号",
       "ground_truth": "四川省成都市武侯区红牌楼街道二环路南四段30号",
       "fields": {
-        "province": "四川省", "city": "成都市", "district": "武侯区",
-        "street": "红牌楼街道", "road": "二环路南四段", "house_no": "30号",
-        "community": "", "building": "", "unit": "", "room": ""
+        "province": "四川省",
+        "city": "成都市",
+        "district": "武侯区",
+        "street": "红牌楼街道",
+        "road": "二环路南四段",
+        "house_no": "30号",
+        "community": "",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["dialect_word", "homophone", "long"],
-      "notes": "屋头=家；武侯/五猴、红牌楼/红排楼 为高危同音异形"
+      "difficulty": [
+        "dialect_word",
+        "homophone",
+        "long"
+      ],
+      "notes": "屋头=家；武侯/五猴、红牌楼/红排楼 为高危同音异形",
+      "dialect_group": "官话",
+      "sub_dialect": "成都话",
+      "address_depth": "full",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "我屋头在成都市武侯区红牌楼街道二环路南四段三十号"
     },
     {
       "id": "002",
@@ -39,12 +64,31 @@
       "spoken": "送到锦江区春熙路步行街五号附二号",
       "ground_truth": "四川省成都市锦江区春熙路步行街5号附2号",
       "fields": {
-        "province": "四川省", "city": "成都市", "district": "锦江区",
-        "street": "", "road": "春熙路步行街", "house_no": "5号附2号",
-        "community": "", "building": "", "unit": "", "room": ""
+        "province": "四川省",
+        "city": "成都市",
+        "district": "锦江区",
+        "street": "",
+        "road": "春熙路步行街",
+        "house_no": "5号附2号",
+        "community": "",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["incomplete", "spoken_number"],
-      "notes": "省市均省略；「附N号」是四川特有门牌格式"
+      "difficulty": [
+        "incomplete",
+        "spoken_number"
+      ],
+      "notes": "省市均省略；「附N号」是四川特有门牌格式",
+      "dialect_group": "官话",
+      "sub_dialect": "成都话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "送到锦江区春熙路步行街五号附二号"
     },
     {
       "id": "003",
@@ -52,12 +96,31 @@
       "spoken": "重庆渝中区解放碑民权路十八号三单元二零一",
       "ground_truth": "重庆市渝中区解放碑街道民权路18号3单元201室",
       "fields": {
-        "province": "重庆市", "city": "重庆市", "district": "渝中区",
-        "street": "解放碑街道", "road": "民权路", "house_no": "18号",
-        "community": "", "building": "", "unit": "3单元", "room": "201室"
+        "province": "重庆市",
+        "city": "重庆市",
+        "district": "渝中区",
+        "street": "解放碑街道",
+        "road": "民权路",
+        "house_no": "18号",
+        "community": "",
+        "building": "",
+        "unit": "3单元",
+        "room": "201室"
       },
-      "difficulty": ["spoken_number", "long"],
-      "notes": "「二零一」需归一化为 201；单元室号绝不可从地址库猜"
+      "difficulty": [
+        "spoken_number",
+        "long"
+      ],
+      "notes": "「二零一」需归一化为 201；单元室号绝不可从地址库猜",
+      "dialect_group": "官话",
+      "sub_dialect": "重庆话",
+      "address_depth": "full",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "重庆渝中区解放碑民权路十八号三单元二零一"
     },
     {
       "id": "004",
@@ -65,12 +128,32 @@
       "spoken": "沙坪坝区三峡广场那个磁器口古镇",
       "ground_truth": "重庆市沙坪坝区磁器口古镇",
       "fields": {
-        "province": "重庆市", "city": "重庆市", "district": "沙坪坝区",
-        "street": "", "road": "", "house_no": "",
-        "community": "磁器口古镇", "building": "", "unit": "", "room": ""
+        "province": "重庆市",
+        "city": "重庆市",
+        "district": "沙坪坝区",
+        "street": "",
+        "road": "",
+        "house_no": "",
+        "community": "磁器口古镇",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["flat_retroflex", "homophone", "incomplete"],
-      "notes": "沙坪坝 sha/sa 平翘舌；磁器口/瓷器口 同音异形"
+      "difficulty": [
+        "flat_retroflex",
+        "homophone",
+        "incomplete"
+      ],
+      "notes": "沙坪坝 sha/sa 平翘舌；磁器口/瓷器口 同音异形",
+      "dialect_group": "官话",
+      "sub_dialect": "重庆话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "沙坪坝区三峡广场那个磁器口古镇"
     },
     {
       "id": "005",
@@ -78,12 +161,31 @@
       "spoken": "郫都区犀浦镇成灌东路三百二十六号",
       "ground_truth": "四川省成都市郫都区犀浦街道成灌东路326号",
       "fields": {
-        "province": "四川省", "city": "成都市", "district": "郫都区",
-        "street": "犀浦街道", "road": "成灌东路", "house_no": "326号",
-        "community": "", "building": "", "unit": "", "room": ""
+        "province": "四川省",
+        "city": "成都市",
+        "district": "郫都区",
+        "street": "犀浦街道",
+        "road": "成灌东路",
+        "house_no": "326号",
+        "community": "",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["rare_char", "incomplete"],
-      "notes": "郫 pí 生僻；犀浦 xī pǔ 易误识"
+      "difficulty": [
+        "rare_char",
+        "incomplete"
+      ],
+      "notes": "郫 pí 生僻；犀浦 xī pǔ 易误识",
+      "dialect_group": "官话",
+      "sub_dialect": "成都话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "郫都区犀浦镇成灌东路三百二十六号"
     },
     {
       "id": "006",
@@ -91,12 +193,32 @@
       "spoken": "青羊区宽窄巷子那边的金河路七号",
       "ground_truth": "四川省成都市青羊区金河路7号",
       "fields": {
-        "province": "四川省", "city": "成都市", "district": "青羊区",
-        "street": "", "road": "金河路", "house_no": "7号",
-        "community": "宽窄巷子", "building": "", "unit": "", "room": ""
+        "province": "四川省",
+        "city": "成都市",
+        "district": "青羊区",
+        "street": "",
+        "road": "金河路",
+        "house_no": "7号",
+        "community": "宽窄巷子",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["nasal", "reordered", "incomplete"],
-      "notes": "青羊 qing/qin 前后鼻音；以地标定位再给门牌"
+      "difficulty": [
+        "nasal",
+        "reordered",
+        "incomplete"
+      ],
+      "notes": "青羊 qing/qin 前后鼻音；以地标定位再给门牌",
+      "dialect_group": "官话",
+      "sub_dialect": "成都话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "青羊区宽窄巷子那边的金河路七号"
     },
     {
       "id": "007",
@@ -104,12 +226,32 @@
       "spoken": "南岸区南坪东路五号龙湖花园八栋二单元一零三",
       "ground_truth": "重庆市南岸区南坪东路5号龙湖花园8栋2单元103室",
       "fields": {
-        "province": "重庆市", "city": "重庆市", "district": "南岸区",
-        "street": "", "road": "南坪东路", "house_no": "5号",
-        "community": "龙湖花园", "building": "8栋", "unit": "2单元", "room": "103室"
+        "province": "重庆市",
+        "city": "重庆市",
+        "district": "南岸区",
+        "street": "",
+        "road": "南坪东路",
+        "house_no": "5号",
+        "community": "龙湖花园",
+        "building": "8栋",
+        "unit": "2单元",
+        "room": "103室"
       },
-      "difficulty": ["nl_merge", "spoken_number", "long"],
-      "notes": "南岸 nan/lan 边鼻音；完整层级到室号"
+      "difficulty": [
+        "nl_merge",
+        "spoken_number",
+        "long"
+      ],
+      "notes": "南岸 nan/lan 边鼻音；完整层级到室号",
+      "dialect_group": "官话",
+      "sub_dialect": "重庆话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "南岸区南坪东路五号龙湖花园八栋二单元一零三"
     },
     {
       "id": "008",
@@ -117,12 +259,31 @@
       "spoken": "贵阳市花溪区花溪大道南段一百一十六号",
       "ground_truth": "贵州省贵阳市花溪区花溪大道南段116号",
       "fields": {
-        "province": "贵州省", "city": "贵阳市", "district": "花溪区",
-        "street": "", "road": "花溪大道南段", "house_no": "116号",
-        "community": "", "building": "", "unit": "", "room": ""
+        "province": "贵州省",
+        "city": "贵阳市",
+        "district": "花溪区",
+        "street": "",
+        "road": "花溪大道南段",
+        "house_no": "116号",
+        "community": "",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["hf_merge", "incomplete"],
-      "notes": "花溪 hua/fa 是 h/f 不分的典型触发点"
+      "difficulty": [
+        "hf_merge",
+        "incomplete"
+      ],
+      "notes": "花溪 hua/fa 是 h/f 不分的典型触发点",
+      "dialect_group": "官话",
+      "sub_dialect": "贵阳话",
+      "address_depth": "full",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "贵阳市花溪区花溪大道南段一百一十六号"
     },
     {
       "id": "009",
@@ -130,12 +291,33 @@
       "spoken": "云岩区中华北路甲秀楼旁边那栋楼三楼",
       "ground_truth": "贵州省贵阳市云岩区中华北路甲秀楼3楼",
       "fields": {
-        "province": "贵州省", "city": "贵阳市", "district": "云岩区",
-        "street": "", "road": "中华北路", "house_no": "",
-        "community": "甲秀楼", "building": "", "unit": "", "room": "", "floor": "3楼"
+        "province": "贵州省",
+        "city": "贵阳市",
+        "district": "云岩区",
+        "street": "",
+        "road": "中华北路",
+        "house_no": "",
+        "community": "甲秀楼",
+        "building": "",
+        "unit": "",
+        "room": "",
+        "floor": "3楼"
       },
-      "difficulty": ["incomplete", "dialect_word", "reordered"],
-      "notes": "地址残缺，无门牌；地标「甲秀楼」保留（与 012/023 口径一致：地标后无更具体目的地时保留）。考察系统是否会硬编门牌号（不该编）"
+      "difficulty": [
+        "incomplete",
+        "dialect_word",
+        "reordered"
+      ],
+      "notes": "地址残缺，无门牌；地标「甲秀楼」保留（与 012/023 口径一致：地标后无更具体目的地时保留）。考察系统是否会硬编门牌号（不该编）",
+      "dialect_group": "官话",
+      "sub_dialect": "贵阳话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "云岩区中华北路甲秀楼旁边那栋楼三楼"
     },
     {
       "id": "010",
@@ -143,12 +325,31 @@
       "spoken": "昆明市五华区翠湖北路二十三号",
       "ground_truth": "云南省昆明市五华区翠湖北路23号",
       "fields": {
-        "province": "云南省", "city": "昆明市", "district": "五华区",
-        "street": "", "road": "翠湖北路", "house_no": "23号",
-        "community": "", "building": "", "unit": "", "room": ""
+        "province": "云南省",
+        "city": "昆明市",
+        "district": "五华区",
+        "street": "",
+        "road": "翠湖北路",
+        "house_no": "23号",
+        "community": "",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["flat_retroflex", "incomplete"],
-      "notes": "五华 wu hua 与 五花/武华 同音"
+      "difficulty": [
+        "flat_retroflex",
+        "incomplete"
+      ],
+      "notes": "五华 wu hua 与 五花/武华 同音",
+      "dialect_group": "官话",
+      "sub_dialect": "昆明话",
+      "address_depth": "full",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "昆明市五华区翠湖北路二十三号"
     },
     {
       "id": "011",
@@ -156,12 +357,33 @@
       "spoken": "官渡区呈贡新区雨花路万科城十二幢一单元五零二",
       "ground_truth": "云南省昆明市呈贡区雨花路万科城12幢1单元502室",
       "fields": {
-        "province": "云南省", "city": "昆明市", "district": "呈贡区",
-        "street": "", "road": "雨花路", "house_no": "",
-        "community": "万科城", "building": "12幢", "unit": "1单元", "room": "502室"
+        "province": "云南省",
+        "city": "昆明市",
+        "district": "呈贡区",
+        "street": "",
+        "road": "雨花路",
+        "house_no": "",
+        "community": "万科城",
+        "building": "12幢",
+        "unit": "1单元",
+        "room": "502室"
       },
-      "difficulty": ["flat_retroflex", "spoken_number", "long", "reordered"],
-      "notes": "呈贡 cheng/ceng 平翘舌+前后鼻音双触发；口语把官渡与呈贡并提，实际行政归属为呈贡区——考察层级合法性校验"
+      "difficulty": [
+        "flat_retroflex",
+        "spoken_number",
+        "long",
+        "reordered"
+      ],
+      "notes": "呈贡 cheng/ceng 平翘舌+前后鼻音双触发；口语把官渡与呈贡并提，实际行政归属为呈贡区——考察层级合法性校验",
+      "dialect_group": "官话",
+      "sub_dialect": "昆明话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "官渡区呈贡新区雨花路万科城十二幢一单元五零二"
     },
     {
       "id": "012",
@@ -169,12 +391,32 @@
       "spoken": "成华区建设路万象城对面那个院坝头",
       "ground_truth": "四川省成都市成华区建设路万象城",
       "fields": {
-        "province": "四川省", "city": "成都市", "district": "成华区",
-        "street": "", "road": "建设路", "house_no": "",
-        "community": "万象城", "building": "", "unit": "", "room": ""
+        "province": "四川省",
+        "city": "成都市",
+        "district": "成华区",
+        "street": "",
+        "road": "建设路",
+        "house_no": "",
+        "community": "万象城",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["dialect_word", "flat_retroflex", "incomplete"],
-      "notes": "院坝=院子（西南官话）；成华 cheng/ceng"
+      "difficulty": [
+        "dialect_word",
+        "flat_retroflex",
+        "incomplete"
+      ],
+      "notes": "院坝=院子（西南官话）；成华 cheng/ceng",
+      "dialect_group": "官话",
+      "sub_dialect": "成都话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "成华区建设路万象城对面那个院坝头"
     },
     {
       "id": "013",
@@ -182,12 +424,32 @@
       "spoken": "龙泉驿区大面街道龙泉大道一段八十八号",
       "ground_truth": "四川省成都市龙泉驿区大面街道龙泉大道一段88号",
       "fields": {
-        "province": "四川省", "city": "成都市", "district": "龙泉驿区",
-        "street": "大面街道", "road": "龙泉大道一段", "house_no": "88号",
-        "community": "", "building": "", "unit": "", "room": ""
+        "province": "四川省",
+        "city": "成都市",
+        "district": "龙泉驿区",
+        "street": "大面街道",
+        "road": "龙泉大道一段",
+        "house_no": "88号",
+        "community": "",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["nl_merge", "nasal", "long"],
-      "notes": "龙泉 long/nong 边鼻音+前后鼻音"
+      "difficulty": [
+        "nl_merge",
+        "nasal",
+        "long"
+      ],
+      "notes": "龙泉 long/nong 边鼻音+前后鼻音",
+      "dialect_group": "官话",
+      "sub_dialect": "成都话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "龙泉驿区大面街道龙泉大道一段八十八号"
     },
     {
       "id": "014",
@@ -195,12 +457,31 @@
       "spoken": "九龙坡区杨家坪步行街西郊路幺零幺号",
       "ground_truth": "重庆市九龙坡区杨家坪步行街西郊路101号",
       "fields": {
-        "province": "重庆市", "city": "重庆市", "district": "九龙坡区",
-        "street": "", "road": "西郊路", "house_no": "101号",
-        "community": "杨家坪步行街", "building": "", "unit": "", "room": ""
+        "province": "重庆市",
+        "city": "重庆市",
+        "district": "九龙坡区",
+        "street": "",
+        "road": "西郊路",
+        "house_no": "101号",
+        "community": "杨家坪步行街",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["spoken_number", "nl_merge"],
-      "notes": "「幺」= 1，是电话/门牌口语读法，必须归一化"
+      "difficulty": [
+        "spoken_number",
+        "nl_merge"
+      ],
+      "notes": "「幺」= 1，是电话/门牌口语读法，必须归一化",
+      "dialect_group": "官话",
+      "sub_dialect": "重庆话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "九龙坡区杨家坪步行街西郊路幺零幺号"
     },
     {
       "id": "015",
@@ -208,12 +489,32 @@
       "spoken": "金牛区茶店子西街那个巷巷头四十五号",
       "ground_truth": "四川省成都市金牛区茶店子西街45号",
       "fields": {
-        "province": "四川省", "city": "成都市", "district": "金牛区",
-        "street": "", "road": "茶店子西街", "house_no": "45号",
-        "community": "", "building": "", "unit": "", "room": ""
+        "province": "四川省",
+        "city": "成都市",
+        "district": "金牛区",
+        "street": "",
+        "road": "茶店子西街",
+        "house_no": "45号",
+        "community": "",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["dialect_word", "nasal", "incomplete"],
-      "notes": "巷巷=小巷（西南官话叠词）；金牛 jin/jing"
+      "difficulty": [
+        "dialect_word",
+        "nasal",
+        "incomplete"
+      ],
+      "notes": "巷巷=小巷（西南官话叠词）；金牛 jin/jing",
+      "dialect_group": "官话",
+      "sub_dialect": "成都话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "金牛区茶店子西街那个巷巷头四十五号"
     },
     {
       "id": "016",
@@ -221,12 +522,31 @@
       "spoken": "渝北区龙溪街道新南路二十六号附一号",
       "ground_truth": "重庆市渝北区龙溪街道新南路26号附1号",
       "fields": {
-        "province": "重庆市", "city": "重庆市", "district": "渝北区",
-        "street": "龙溪街道", "road": "新南路", "house_no": "26号附1号",
-        "community": "", "building": "", "unit": "", "room": ""
+        "province": "重庆市",
+        "city": "重庆市",
+        "district": "渝北区",
+        "street": "龙溪街道",
+        "road": "新南路",
+        "house_no": "26号附1号",
+        "community": "",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["nl_merge", "spoken_number"],
-      "notes": "龙溪 long xi；附1号门牌格式"
+      "difficulty": [
+        "nl_merge",
+        "spoken_number"
+      ],
+      "notes": "龙溪 long xi；附1号门牌格式",
+      "dialect_group": "官话",
+      "sub_dialect": "重庆话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "渝北区龙溪街道新南路二十六号附一号"
     },
     {
       "id": "017",
@@ -234,12 +554,31 @@
       "spoken": "双流区东升街道航空路一号成都双流机场",
       "ground_truth": "四川省成都市双流区东升街道航空路1号成都双流国际机场",
       "fields": {
-        "province": "四川省", "city": "成都市", "district": "双流区",
-        "street": "东升街道", "road": "航空路", "house_no": "1号",
-        "community": "成都双流国际机场", "building": "", "unit": "", "room": ""
+        "province": "四川省",
+        "city": "成都市",
+        "district": "双流区",
+        "street": "东升街道",
+        "road": "航空路",
+        "house_no": "1号",
+        "community": "成都双流国际机场",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["flat_retroflex", "long"],
-      "notes": "双流 shuang/suang；机场口语简称需补全"
+      "difficulty": [
+        "flat_retroflex",
+        "long"
+      ],
+      "notes": "双流 shuang/suang；机场口语简称需补全",
+      "dialect_group": "官话",
+      "sub_dialect": "成都话",
+      "address_depth": "full",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "双流区东升街道航空路一号成都双流机场"
     },
     {
       "id": "018",
@@ -247,12 +586,32 @@
       "spoken": "观山湖区金阳南路世纪城三十六栋",
       "ground_truth": "贵州省贵阳市观山湖区金阳南路世纪城36栋",
       "fields": {
-        "province": "贵州省", "city": "贵阳市", "district": "观山湖区",
-        "street": "", "road": "金阳南路", "house_no": "",
-        "community": "世纪城", "building": "36栋", "unit": "", "room": ""
+        "province": "贵州省",
+        "city": "贵阳市",
+        "district": "观山湖区",
+        "street": "",
+        "road": "金阳南路",
+        "house_no": "",
+        "community": "世纪城",
+        "building": "36栋",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["nasal", "incomplete", "spoken_number"],
-      "notes": "观山湖 guan shan hu；金阳 jin/jing"
+      "difficulty": [
+        "nasal",
+        "incomplete",
+        "spoken_number"
+      ],
+      "notes": "观山湖 guan shan hu；金阳 jin/jing",
+      "dialect_group": "官话",
+      "sub_dialect": "贵阳话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "观山湖区金阳南路世纪城三十六栋"
     },
     {
       "id": "019",
@@ -260,12 +619,32 @@
       "spoken": "武侯区玉林南路那个玉林小区七栋三单元",
       "ground_truth": "四川省成都市武侯区玉林南路玉林小区7栋3单元",
       "fields": {
-        "province": "四川省", "city": "成都市", "district": "武侯区",
-        "street": "", "road": "玉林南路", "house_no": "",
-        "community": "玉林小区", "building": "7栋", "unit": "3单元", "room": ""
+        "province": "四川省",
+        "city": "成都市",
+        "district": "武侯区",
+        "street": "",
+        "road": "玉林南路",
+        "house_no": "",
+        "community": "玉林小区",
+        "building": "7栋",
+        "unit": "3单元",
+        "room": ""
       },
-      "difficulty": ["homophone", "spoken_number", "incomplete"],
-      "notes": "玉林重复出现（路名+小区名），考察是否会误合并"
+      "difficulty": [
+        "homophone",
+        "spoken_number",
+        "incomplete"
+      ],
+      "notes": "玉林重复出现（路名+小区名），考察是否会误合并",
+      "dialect_group": "官话",
+      "sub_dialect": "成都话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "武侯区玉林南路那个玉林小区七栋三单元"
     },
     {
       "id": "020",
@@ -273,12 +652,33 @@
       "spoken": "盘龙区北京路七百七十七号世纪广场B座十六楼",
       "ground_truth": "云南省昆明市盘龙区北京路777号世纪广场B座16楼",
       "fields": {
-        "province": "云南省", "city": "昆明市", "district": "盘龙区",
-        "street": "", "road": "北京路", "house_no": "777号",
-        "community": "世纪广场", "building": "B座", "unit": "", "room": "16楼"
+        "province": "云南省",
+        "city": "昆明市",
+        "district": "盘龙区",
+        "street": "",
+        "road": "北京路",
+        "house_no": "777号",
+        "community": "世纪广场",
+        "building": "B座",
+        "unit": "",
+        "room": "",
+        "floor": "16楼"
       },
-      "difficulty": ["nl_merge", "spoken_number", "long"],
-      "notes": "盘龙 pan long；含字母楼栋号 B座"
+      "difficulty": [
+        "nl_merge",
+        "spoken_number",
+        "long"
+      ],
+      "notes": "盘龙 pan long；含字母楼栋号 B座；16楼 是楼层（floor），不是室号",
+      "dialect_group": "官话",
+      "sub_dialect": "昆明话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "盘龙区北京路七百七十七号世纪广场B座十六楼"
     },
     {
       "id": "021",
@@ -286,12 +686,31 @@
       "spoken": "江北区观音桥步行街建新北路六十五号",
       "ground_truth": "重庆市江北区观音桥街道建新北路65号",
       "fields": {
-        "province": "重庆市", "city": "重庆市", "district": "江北区",
-        "street": "观音桥街道", "road": "建新北路", "house_no": "65号",
-        "community": "", "building": "", "unit": "", "room": ""
+        "province": "重庆市",
+        "city": "重庆市",
+        "district": "江北区",
+        "street": "观音桥街道",
+        "road": "建新北路",
+        "house_no": "65号",
+        "community": "",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["nasal", "incomplete"],
-      "notes": "观音桥 guan yin qiao，yin/ying 前后鼻音"
+      "difficulty": [
+        "nasal",
+        "incomplete"
+      ],
+      "notes": "观音桥 guan yin qiao，yin/ying 前后鼻音",
+      "dialect_group": "官话",
+      "sub_dialect": "重庆话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "江北区观音桥步行街建新北路六十五号"
     },
     {
       "id": "022",
@@ -299,12 +718,32 @@
       "spoken": "就是天府新区那个兴隆湖旁边天府大道南段两千六百号",
       "ground_truth": "四川省成都市天府新区天府大道南段2600号",
       "fields": {
-        "province": "四川省", "city": "成都市", "district": "天府新区",
-        "street": "", "road": "天府大道南段", "house_no": "2600号",
-        "community": "兴隆湖", "building": "", "unit": "", "room": ""
+        "province": "四川省",
+        "city": "成都市",
+        "district": "天府新区",
+        "street": "",
+        "road": "天府大道南段",
+        "house_no": "2600号",
+        "community": "兴隆湖",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["reordered", "spoken_number", "incomplete"],
-      "notes": "「两千六百」需归一化为 2600；以地标先定位"
+      "difficulty": [
+        "reordered",
+        "spoken_number",
+        "incomplete"
+      ],
+      "notes": "「两千六百」需归一化为 2600；以地标先定位",
+      "dialect_group": "官话",
+      "sub_dialect": "成都话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "就是天府新区那个兴隆湖旁边天府大道南段两千六百号"
     },
     {
       "id": "023",
@@ -312,12 +751,32 @@
       "spoken": "我在渝中区那个较场口得意世界楼上",
       "ground_truth": "重庆市渝中区较场口得意世界",
       "fields": {
-        "province": "重庆市", "city": "重庆市", "district": "渝中区",
-        "street": "", "road": "", "house_no": "",
-        "community": "得意世界", "building": "", "unit": "", "room": ""
+        "province": "重庆市",
+        "city": "重庆市",
+        "district": "渝中区",
+        "street": "",
+        "road": "",
+        "house_no": "",
+        "community": "得意世界",
+        "building": "",
+        "unit": "",
+        "room": ""
       },
-      "difficulty": ["rare_char", "incomplete", "dialect_word"],
-      "notes": "较场口 jiào 易误读 jiǎo；地址高度残缺，考察兜底是否吐 N-best"
+      "difficulty": [
+        "rare_char",
+        "incomplete",
+        "dialect_word"
+      ],
+      "notes": "较场口 jiào 易误读 jiǎo；地址高度残缺，考察兜底是否吐 N-best",
+      "dialect_group": "官话",
+      "sub_dialect": "重庆话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "我在渝中区那个较场口得意世界楼上"
     },
     {
       "id": "024",
@@ -325,12 +784,32 @@
       "spoken": "高新区天府三街新希望国际A座二十楼二零零八",
       "ground_truth": "四川省成都市高新区天府三街新希望国际A座20楼2008室",
       "fields": {
-        "province": "四川省", "city": "成都市", "district": "高新区",
-        "street": "", "road": "天府三街", "house_no": "",
-        "community": "新希望国际", "building": "A座", "unit": "", "room": "2008室"
+        "province": "四川省",
+        "city": "成都市",
+        "district": "高新区",
+        "street": "",
+        "road": "天府三街",
+        "house_no": "",
+        "community": "新希望国际",
+        "building": "A座",
+        "unit": "",
+        "room": "2008室"
       },
-      "difficulty": ["spoken_number", "long", "incomplete"],
-      "notes": "「二零零八」→2008；楼层与室号同现，易混"
+      "difficulty": [
+        "spoken_number",
+        "long",
+        "incomplete"
+      ],
+      "notes": "「二零零八」→2008；楼层与室号同现，易混",
+      "dialect_group": "官话",
+      "sub_dialect": "成都话",
+      "address_depth": "district",
+      "noise": "clean",
+      "orthography_expected": "simplified",
+      "negative_type": null,
+      "split": "eval",
+      "gold_in_db": true,
+      "transcript_gold": "高新区天府三街新希望国际A座二十楼二零零八"
     }
   ]
 }

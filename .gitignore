@@ -36,3 +36,10 @@ docs/范本_*.md
 # 不写前导斜杠，以便匹配任意层级下的同名目录。
 .omc/
 .claude/
+
+# ---- ASR 结果缓存（本地产物，键为音频 sha1） ----
+eval/cache/
+
+# ---- 评测报告：带时间戳的 json 全部忽略（md 报告保留）----
+eval/reports/2*.json
+eval/cache_recordings.log

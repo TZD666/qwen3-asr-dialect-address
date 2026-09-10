@@ -1,0 +1,16 @@
+{
+  "description": "库缺负样本（评测体系设计 §2.3a）：评测时从 AddressDB 临时删除的条目。被删条目对应的评测项自动获得 negative_type=oov_db。选择原则：库里有近音邻居的优先（同名异城 / 音距离 ≤ 0.25 的兄弟路），这是最容易被错纠的情形。期望行为：decision 为 reject/partial，或原文保留（unverified）；若 confident 且地名被改成邻居，记为过度纠正。",
+  "selection_note": "邻居距离由 scripts 里的 pinyin_distance(GENERIC) 扫描得到（2026-09-10）。dialect_group 目前只有官话；粤/闽/吴的条目等录音齐了再补。",
+  "drop": [
+    { "name": "世纪城", "parent": "观山湖区", "affects": ["018"], "neighbor": "世纪城(官渡区/高新区) 0.000 同名异城" },
+    { "name": "北京路", "parent": "盘龙区", "affects": ["020"], "neighbor": "北京路(越秀区) 0.000 同名异城" },
+    { "name": "南坪东路", "parent": "南岸区", "affects": ["007"], "neighbor": "南京东路(黄浦区) 0.113" },
+    { "name": "新南路", "parent": "渝北区", "affects": ["016"], "neighbor": "湖南路(鼓楼区) 0.213" },
+    { "name": "犀浦街道", "parent": "郫都区", "affects": ["005"], "neighbor": "西湖(西湖区) 0.225" },
+    { "name": "中华北路", "parent": "云岩区", "affects": ["009"], "neighbor": "中华南路(南明区) 0.250 / 科华北路(武侯区) 0.250" },
+    { "name": "天府三街", "parent": "高新区", "affects": ["024"], "neighbor": "天府一街/天府五街(高新区) 0.250 同区兄弟路" },
+    { "name": "春熙路", "parent": "锦江区", "affects": ["002"], "neighbor": "黄兴路步行街(天心区) 0.258" },
+    { "name": "玉林南路", "parent": "武侯区", "affects": ["019"], "neighbor": "玉林街道/玉林小区(武侯区) 0.333 同区" },
+    { "name": "万科城", "parent": "呈贡区", "affects": ["011"], "neighbor": "万象城(成华区) 0.333" }
+  ]
+}

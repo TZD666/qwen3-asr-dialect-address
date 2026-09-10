@@ -1,0 +1,47 @@
+# 无模型回归（评测体系设计 §7）：库 / 代价矩阵 / 权重 / 阈值 / 拼装 任一改动都跑。
+# 只跑不需要模型权重的部分：单测 + 24 句 text + oov 负样本 + 合成扰动集。
+# 注入用例需要模型，本地跑：python eval/regression.py --with-injection
+name: eval-regression
+
+on:
+  push:
+    paths:
+      - "data/addresses/**"
+      - "data/eval/**"
+      - "src/dialect_addr/pinyin_dialect.py"
+      - "src/dialect_addr/romanize.py"
+      - "src/dialect_addr/dialect_lexicon.py"
+      - "src/dialect_addr/normalize.py"
+      - "src/dialect_addr/rank.py"
+      - "src/dialect_addr/pipeline.py"
+      - "src/dialect_addr/address_db.py"
+      - "eval/**"
+      - "tests/**"
+      - ".github/workflows/eval.yml"
+  pull_request:
+    paths:
+      - "data/addresses/**"
+      - "data/eval/**"
+      - "src/dialect_addr/**"
+      - "eval/**"
+      - "tests/**"
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装纯文本链路依赖
+        run: pip install "pypinyin>=0.53,<1" "numpy>=1.26,<3" pytest
+      - name: 单测
+        run: python -m pytest -q tests
+      - name: 清单与 schema 校验
+        run: python eval/check_manifest.py
+      - name: 合成扰动集可回放
+        run: python scripts/gen_perturbed.py --verify
+      - name: 回归（与 eval/golden 逐分片比）
+        run: python eval/regression.py

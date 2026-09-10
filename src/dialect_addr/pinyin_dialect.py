@@ -212,6 +212,32 @@ def to_syllables(text: str) -> tuple[Syllable, ...]:
     )
 
 
+_INITIALS = ("zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h",
+             "j", "q", "x", "r", "z", "c", "s", "y", "w")
+
+
+def _split_pinyin(py: str) -> Syllable:
+    for ini in _INITIALS:
+        if py.startswith(ini) and len(py) > len(ini):
+            return Syllable(initial=ini, final=_norm_final(py[len(ini):]), raw=py)
+    return Syllable(initial="", final=_norm_final(py), raw=py)
+
+
+@functools.lru_cache(maxsize=4096)
+def char_readings(ch: str) -> tuple[Syllable, ...]:
+    """一个汉字的全部读音（多音字）。"都"单独读 dou、在"成都"里读 du——
+    比对一小段脱离上下文的碎片时，只认第一个读音会把"曾都"和"成都"判成不像。"""
+    from pypinyin import pinyin as _pinyin
+
+    try:
+        alts = _pinyin(ch, style=Style.NORMAL, heteronym=True, errors="ignore")
+    except Exception:  # pragma: no cover
+        return ()
+    if not alts or not alts[0]:
+        return ()
+    return tuple(_split_pinyin(p) for p in dict.fromkeys(alts[0]))
+
+
 def syllable_distance(a: Syllable, b: Syllable, profile: DialectProfile = GENERIC) -> float:
     """两个音节的距离，归一化到 0~1。"""
     if a.raw == b.raw:

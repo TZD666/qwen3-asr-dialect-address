@@ -39,11 +39,15 @@ import re
 from dataclasses import dataclass, field
 
 from .address_db import LEVEL_ORDER, AddressDB, AddressEntry, Level
-from .pinyin_dialect import Syllable, syllable_edit_distance
+from .pinyin_dialect import Syllable, syllable_distance, syllable_edit_distance
 from .romanize import PhonSpace, family_of, resolve_space
 
 _HAN = re.compile(r"[一-鿿]")
 _DEMONYM_SUFFIX = set("话腔人佬妹仔音调味菜")   # 河南话/武汉腔/四川人/湘菜/川味
+# 方位/序数/新老大小：同一条路的"兄弟"靠这些字区分（中华中路/中华北路、天府一街/天府三街）。
+# 说话人说的是"中"，库里只有"北"，两个音毫不相干（代价 1.0）——这不是听错，是库里没有这条路。
+_SIBLING_CHARS = set("东西南北中上下内外前后左右新老大小一二三四五六七八九十")
+_SIBLING_COST = 0.9      # 该位置的音节代价 ≥ 此值才算"毫不相干"；n/l、前后鼻音这类系统性音变不触发
 
 # 每个层级的"特异性权重"：越具体的层级，命中越有说服力
 _LEVEL_W: dict[str, float] = {
@@ -58,6 +62,9 @@ W_CONFLICT = 0.25          # 冲突惩罚（减项）
 MARGIN_MIN = 0.06          # Top1-Top2 分差低于此 → ambiguous
 SIM_MIN = 0.62             # Top1 音相似度低于此 → reject
 STRONG_HIT = 0.15          # 距离低于此视为"强命中"，用于冲突检测
+LONGER_NAME_TOL = 0.08     # 同一条目：更长的名字距离不比最短的差这么多，就用更长的（见 best_window）
+UNIQUE_SHORT_MAX = 0.05    # ≤2 音节但全库拼音唯一、且几乎精确命中的名字，不按弱命中处理（澳门/台湾）
+SINGLE_HIT_MIN_COV = 0.25  # 全句只有一处近似命中且覆盖率低于此 → reject（孤证不立，见 decide）
 
 
 @dataclass
@@ -153,6 +160,107 @@ def _han_only(text: str) -> str:
     return "".join(_HAN.findall(text))
 
 
+def best_window(
+    syls: tuple[Syllable, ...],
+    entry: AddressEntry,
+    space: PhonSpace,
+    prefilter: bool = True,
+) -> tuple[float, tuple[int, int], str] | None:
+    """一个条目在输入音节序列上最像的窗口：(归一化距离, [起,止), 命中的名字)。
+
+    窗口宽度取条目音节数 ±1，容忍口语多说/少说一个字。
+    这一步不需要事先分词——分词本身在方言误识文本上就不可靠。
+    prefilter=False 时跳过"至少共享一个音节"的预筛（评测里诊断召回失败原因用）。
+
+    同一条目的多个名字之间**不是**单纯取距离最小：更长的名字只要距离不比最短的差
+    LONGER_NAME_TOL 以上，就用更长的。否则 2 字别名会到处抢戏——
+    "浓泉驿区大面街道龙泉大道" 里 龙泉驿区 的别名「龙泉」在"龙泉大道"上距离 0，
+    把本该落在"浓泉驿区"（距离 0.01）的区级命中拽到了路名上，区变成弱命中，
+    链上没了区，还多出一条冲突。合成扰动集里 1/3 的错都是这一个原因。
+    """
+    n = len(syls)
+    text_raw = {s.raw for s in syls}
+    per_name: list[tuple[float, tuple[int, int], str, int]] = []   # (d, span, name, 音节数)
+    for nm in entry.all_names():
+        esyl = space.romanizer(nm)
+        L = len(esyl)
+        if L == 0:
+            continue
+        # 预筛：候选名至少要和输入共享一个完全相同的音节，否则不可能在 0.4 距离内。
+        # 3500 条全国表逐条滑窗要 1.2s，预筛后大部分条目一次集合查询就跳过。
+        if prefilter and not any(s.raw in text_raw for s in esyl):
+            continue
+        best_nm: tuple[float, tuple[int, int]] | None = None
+        for w in (L - 1, L, L + 1):
+            if w < 1 or w > n:
+                continue
+            # 太短的别名（单字）不允许 ±1 宽度，否则到处乱命中
+            if L <= 1 and w != L:
+                continue
+            for s in range(0, n - w + 1):
+                d = syllable_edit_distance(syls[s:s + w], esyl, space.profile) / max(w, L)
+                if best_nm is None or d < best_nm[0] - 1e-9:
+                    best_nm = (d, (s, s + w))
+        if best_nm is not None:
+            per_name.append((best_nm[0], best_nm[1], nm, L))
+    if not per_name:
+        return None
+    d_min = min(p[0] for p in per_name)
+    # 距离在容差内的候选里取最长的名字；同长取距离更小的
+    cands = [p for p in per_name if p[0] <= d_min + LONGER_NAME_TOL]
+    d, span, nm, _ = max(cands, key=lambda p: (p[3], -p[0]))
+    return d, span, nm
+
+
+def effective_max_dist(name: str, space: PhonSpace, max_dist: float = 0.40) -> tuple[float, int]:
+    """短名字更容易撞车：两音节的名字在任意文本里找到距离 0.33 的窗口太容易了。
+    名字越短，要求的距离越严。三音节及以上用满额阈值。返回 (有效阈值, 音节数)。"""
+    L_hit = len(space.romanizer(name))
+    return max_dist * min(1.0, L_hit / 3.0), L_hit
+
+
+_COLLISION_CACHE: dict[tuple[int, str], dict[str, int]] = {}
+
+
+def pinyin_collisions(entries: list[AddressEntry], space: PhonSpace) -> dict[str, int]:
+    """全库每个名字（正名+别名）的无调拼音串 → 有多少个**不同条目**叫这个音。
+
+    区分度代替音节数（方案推演 §15.5）：2 音节名字不能一刀切成弱命中。
+    xiangcheng 撞 6 个区、gulou 撞 4 个，那是真弱；aomen / taiwan 全库唯一，
+    精确命中时就是说话人在报这个地方，不该被当噪声。
+    """
+    key = (id(entries), space.name)
+    hit = _COLLISION_CACHE.get(key)
+    if hit is not None:
+        return hit
+    owners: dict[str, set[str]] = {}
+    for e in entries:
+        for nm in e.all_names():
+            py = " ".join(s.raw for s in space.romanizer(nm))
+            if py:
+                owners.setdefault(py, set()).add(e.adcode)
+    table = {py: len(o) for py, o in owners.items()}
+    _COLLISION_CACHE[key] = table
+    return table
+
+
+def is_sibling_mismatch(han: str, syls: tuple[Syllable, ...], span: tuple[int, int], name: str, space: PhonSpace) -> bool:
+    """命中窗口与库名等长、且**只**在方位/序数字上有毫不相干的替换 → 说的是库里没有的兄弟路。
+
+    中华中路 vs 中华北路：zhong/bei 代价 1.0，其余三个音节全同。这种命中不能要——
+    要了就是把说对的路"纠正"成隔壁那条（方案推演 §10 的中华中路案例）。
+    """
+    s, e = span
+    esyl = space.romanizer(name)
+    if e - s != len(esyl) or len(esyl) < 3:
+        return False
+    for i, (a, b) in enumerate(zip(syls[s:e], esyl)):
+        d = syllable_distance(a, b, space.profile)
+        if d >= _SIBLING_COST and han[s + i] in _SIBLING_CHARS and name[i] in _SIBLING_CHARS:
+            return True
+    return False
+
+
 def find_hits(
     han: str,
     syls: tuple[Syllable, ...],
@@ -160,48 +268,20 @@ def find_hits(
     space: PhonSpace,
     max_dist: float = 0.40,
 ) -> list[Hit]:
-    """滑窗对齐：对每个条目，在输入音节序列上找距离最小的窗口。
-
-    窗口宽度取条目音节数 ±1，容忍口语多说/少说一个字。
-    这一步不需要事先分词——分词本身在方言误识文本上就不可靠。
-    """
+    """滑窗对齐：对每个条目找最像的窗口，按短名收紧阈值，再做同层非极大值抑制。"""
     n = len(syls)
     if n == 0:
         return []
-    # 预筛：候选名至少要和输入共享一个完全相同的音节，否则不可能在 0.4 距离内。
-    # 3500 条全国表逐条滑窗要 1.2s，预筛后大部分条目一次集合查询就跳过。
-    text_raw = {s.raw for s in syls}
+    collisions = pinyin_collisions(entries, space)
     hits: list[Hit] = []
     for e in entries:
-        best: tuple[float, tuple[int, int], str] | None = None
-        for nm in e.all_names():
-            esyl = space.romanizer(nm)
-            L = len(esyl)
-            if L == 0:
-                continue
-            if not any(s.raw in text_raw for s in esyl):
-                continue
-            for w in (L - 1, L, L + 1):
-                if w < 1 or w > n:
-                    continue
-                # 太短的别名（单字）不允许 ±1 宽度，否则到处乱命中
-                if L <= 1 and w != L:
-                    continue
-                for s in range(0, n - w + 1):
-                    d = syllable_edit_distance(syls[s:s + w], esyl, space.profile) / max(w, L)
-                    # 距离相同时偏向**更长的名字**："玉林小区" 比别名 "玉林" 更具体，
-                    # 且不会和相邻的 "玉林南路" 抢同一片文本。
-                    if best is None or d < best[0] - 1e-9 or (
-                        abs(d - best[0]) < 1e-9 and len(nm) > len(best[2])
-                    ):
-                        best = (d, (s, s + w), nm)
+        best = best_window(syls, e, space)
         if best is None:
             continue
-        # 短名字更容易撞车：两音节的名字在任意文本里找到距离 0.33 的窗口太容易了。
-        # 名字越短，要求的距离越严。三音节及以上用满额阈值。
-        L_hit = len(space.romanizer(best[2]))
-        eff_max = max_dist * min(1.0, L_hit / 3.0)
+        eff_max, L_hit = effective_max_dist(best[2], space, max_dist)
         if best[0] > eff_max:
+            continue
+        if best[0] > 1e-9 and is_sibling_mismatch(han, syls, best[1], best[2], space):
             continue
         # "河南话""武汉腔""四川人"：后面紧跟 话/腔/人 的省市名是在说方言或籍贯，不是在报地址。
         # 只对**别名**形式（没带 省/市/区 后缀）做这个排除——"卧龙区人民路"里的
@@ -210,7 +290,15 @@ def find_hits(
             nxt = han[best[1][1]] if best[1][1] < n else ""
             if nxt in _DEMONYM_SUFFIX:
                 continue
-        hits.append(Hit(e, best[0], best[1], best[2], weak=(L_hit <= 2)))
+        weak = L_hit <= 2
+        if weak and best[0] <= UNIQUE_SHORT_MAX and e.level in ("province", "city"):
+            # 省/市的 2 字简称（澳门/台湾/兰州）全库拼音唯一、又几乎精确命中：
+            # 这是说话人在报这个地方，不是撞车。区县级不放行——2800 个区县里
+            # 随便一个唯一音都可能和路名里的两个字撞上，放行的收益远小于风险。
+            py = " ".join(s.raw for s in space.romanizer(best[2]))
+            if collisions.get(py, 0) <= 1:
+                weak = False
+        hits.append(Hit(e, best[0], best[1], best[2], weak=weak))
     hits.sort(key=lambda h: (h.dist, -h.entry.prior))
 
     # 非极大值抑制：同层级、片段重叠、且明显更弱的命中直接丢弃。
@@ -374,10 +462,22 @@ def score_chain(ch: Chain, all_hits: list[Hit], n_chars: int) -> None:
     conflict = 0.0
     own = {e.adcode for e in ch.entries.values()}
     own_spans = [h.span for h in ch.hits.values()] + [h.span for h in ch.extra]
+    # 地址是从大到小说的：路级证据之后再出现的"行政区"（"皮铺还是"撞上珠海市）只是闲话里的巧合，
+    # 不是说话人在报另一个区。只有出现在本链最后一处路级证据之前的强命中才算冲突。
+    road_end = max((h.span[1] for lv, h in evidence if lv in ("street", "road", "poi")), default=None)
+    # 同理，省→市→区是从大到小说的：本链最深一级行政区证据之后再冒出来的**更浅**一级
+    # （"北盛购物中心"里撞出个湖北省），也不是在报另一个地方。
+    admin_ev = [(LEVEL_ORDER.index(lv), h) for lv, h in evidence if lv in ("province", "city", "district")]
+    deepest_admin_rank, admin_end = max(admin_ev, key=lambda x: x[0])[0] if admin_ev else -1, \
+        max((h.span[1] for _, h in admin_ev), default=None)
     for h in all_hits:
         if h.entry.adcode in own or h.dist > STRONG_HIT or h.weak:
             continue
         if h.entry.level not in ("province", "city", "district"):
+            continue
+        if road_end is not None and h.span[0] >= road_end:
+            continue
+        if admin_end is not None and h.span[0] >= admin_end and LEVEL_ORDER.index(h.entry.level) < deepest_admin_rank:
             continue
         if h.entry.level in ch.entries and not any(_spans_overlap(h.span, s) for s in own_spans):
             conflict = max(conflict, h.sim * _LEVEL_W[h.entry.level] / 1.2)
@@ -432,29 +532,46 @@ def rank(
     chains.sort(key=lambda c: -c.total)
     nbest = chains[:topk]
     top = nbest[0]
+    decision, reason = decide(nbest)
+    return RankResult(decision, top, nbest, geo_text, dialect, space.name, reason, hits)
 
-    # ---- 决策 ----
-    def _admin_key(c: Chain) -> tuple:
-        return tuple(c.entries[lv].adcode for lv in ("province", "city", "district") if lv in c.entries)
 
+def admin_key(c: Chain) -> tuple:
+    return tuple(c.entries[lv].adcode for lv in ("province", "city", "district") if lv in c.entries)
+
+
+def has_deep_hit(c: Chain) -> bool:
+    return any(lv in c.hits for lv in ("district", "street", "road", "poi")) or bool(c.extra)
+
+
+def decide(
+    nbest: list[Chain],
+    margin_min: float | None = None,
+    sim_min: float | None = None,
+) -> tuple[str, str]:
+    """三道闸门 → (decision, reason)。单独拆出来是为了评测能在不重跑检索的前提下
+    换阈值重放（risk-coverage 曲线）和做 oracle 实验。"""
+    margin_min = MARGIN_MIN if margin_min is None else margin_min
+    sim_min = SIM_MIN if sim_min is None else sim_min
+    top = nbest[0]
     margin = top.total - nbest[1].total if len(nbest) > 1 else 1.0
-    deep_hit = any(lv in top.hits for lv in ("district", "street", "road", "poi")) or bool(top.extra)
-    if top.sim < SIM_MIN:
-        decision, reason = "reject", f"Top-1 音相似度 {top.sim:.2f} < {SIM_MIN}，不采信"
-    elif not deep_hit:
+    if top.sim < sim_min:
+        return "reject", f"Top-1 音相似度 {top.sim:.2f} < {sim_min}，不采信"
+    ev = list(top.hits.values()) + top.extra
+    if len(ev) == 1 and ev[0].dist > 1e-9 and top.coverage < SINGLE_HIT_MIN_COV:
+        # 孤证不立：整句只撞上一个近似命中，其余大段文本都解释不了——
+        # "用那个闽南话再说一个地址呢也是……"撞出个讷河市就是这种。精确命中（dist=0）不在此列。
+        return "reject", (f"孤证：仅一处近似命中「{ev[0].matched_name}」(dist {ev[0].dist:.2f})，"
+                          f"覆盖率 {top.coverage:.2f} < {SINGLE_HIT_MIN_COV}")
+    if not has_deep_hit(top):
         # 只命中省/市级：地址库对这条地址的其余部分一无所知，不能叫 confident。
         # 未命中的地名段会原样保留（pipeline 里做），但要明确标出"未经核验"。
-        decision, reason = "partial", "仅匹配到省/市级，区/路/小区未在地址库中命中，地名段原样保留"
-    elif margin < MARGIN_MIN and len(nbest) > 1 and _admin_key(nbest[1]) != _admin_key(top):
+        return "partial", "仅匹配到省/市级，区/路/小区未在地址库中命中，地名段原样保留"
+    if margin < margin_min and len(nbest) > 1 and admin_key(nbest[1]) != admin_key(top):
         # 只有 Top-2 指向**另一个行政区**才算真歧义。
         # 同一个区下"主路选哪条"的分歧不影响送达，不该拦下来让人确认。
-        decision, reason = "ambiguous", (
-            f"Top-1/Top-2 分差 {margin:.3f} < {MARGIN_MIN} 且行政区不同，需人工确认"
-        )
-    else:
-        decision, reason = "confident", f"分差 {margin:.3f}"
-
-    return RankResult(decision, top, nbest, geo_text, dialect, space.name, reason, hits)
+        return "ambiguous", f"Top-1/Top-2 分差 {margin:.3f} < {margin_min} 且行政区不同，需人工确认"
+    return "confident", f"分差 {margin:.3f}"
 
 
 def explain(res: RankResult, db: AddressDB, n: int = 3) -> str:

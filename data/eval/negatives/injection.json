@@ -1,0 +1,13 @@
+{
+  "description": "注入负样本（评测体系设计 §2.3c）：由 eval/reports/context_injection.json 的六种条件固化。每条含音频、注入内容、期望关键字段。known_flip=true 是当前已知会被带偏的条件：回归时仍要跑，翻转数不得增加；哪次修改让它不再翻转，就把 known_flip 去掉。",
+  "source": "eval/reports/context_injection.json (2026-09-09T22:40:55)",
+  "truth": "我家在成都市武侯区红牌楼街道二环路南四段三十号",
+  "cases": [
+    { "name": "A 无注入", "audio": "_smoke/tts_mandarin.wav", "inject": null, "expect_key": "红牌楼" },
+    { "name": "B 单个误导候选", "audio": "_smoke/tts_mandarin.wav", "inject": ["四川省成都市武侯区红牌坊街道"], "expect_key": "红牌楼" },
+    { "name": "C 误导+含坊干扰", "audio": "_smoke/tts_mandarin.wav", "inject": ["四川省成都市武侯区红牌坊街道", "四川省成都市金牛区花牌坊街"], "expect_key": "红牌楼", "known_flip": true },
+    { "name": "D 误导+无关干扰", "audio": "_smoke/tts_mandarin.wav", "inject": ["四川省成都市武侯区红牌坊街道", "四川省成都市锦江区春熙路"], "expect_key": "红牌楼", "known_flip": true },
+    { "name": "E 两条都含坊", "audio": "_smoke/tts_mandarin.wav", "inject": ["四川省成都市武侯区红牌坊街道", "四川省成都市武侯区红牌坊社区"], "expect_key": "红牌楼" },
+    { "name": "F 只给含坊干扰", "audio": "_smoke/tts_mandarin.wav", "inject": ["四川省成都市金牛区花牌坊街"], "expect_key": "红牌楼" }
+  ]
+}
