@@ -157,7 +157,12 @@ python eval/run_eval.py --mode text --oracle all         # 库完备 / 排序完
 python eval/run_eval.py --mode text --eval data/eval/synthetic/perturbed.jsonl --tag synthetic   # 720 条合成扰动
 python eval/run_eval.py --mode audio                     # 按 data/eval/manifest.jsonl 跑全部录音，配对 baseline
 python eval/regression.py                                # 无模型回归：与 eval/golden 逐分片比，退化即失败
+python eval/selfcheck.py --fast                          # 评测自检：故意破坏，看每个归因标签抓不抓得住
+python eval/features.py && python eval/tune.py           # 调参闭环：检索一次、重放搜权重阈值 → 提案（不落地）
+python eval/tune.py --apply eval/tuning/<提案>.json       # 人看过提案后才写 data/params/rank_params.json
 ```
+
+后处理的参数（五个权重、三道阈值、四个检索常量）不在代码里，在 `data/params/rank_params.json`，带版本、来源（手设 / 学出）和数据快照指纹；`/api/status` 和每份报告头都报当前版本与代码提交号。新录音进来的路径是 `scripts/intake.py`：转写进缓存 → 补清单行 → 说话人填真值 → 校验 → 特征 dump → 提案。提案里最要紧的是**可辨识表**：每个参数在当前数据上被钉住了多少。数据钉不住的参数，闭环不会动它。
 
 评测不只报一个总分。每条样本按六个阶段分别打分（裸 ASR、归一化、召回、排序、闸门、补全），端到端错的样本用决策树贴**一个**归因标签（库缺 / 声学不可恢复 / 归一化错 / 召回漏 / 排错 / 闸门放行 / 闸门误拦 / 补全错），报告按方言、地址深度、口语噪声、难点、负样本类型分片，百分比一律带 Wilson 区间，n < 20 只报 k/n。三类负样本（库缺、ASR 已对、注入带偏）和三个 oracle 开关分别回答"改坏率多少"和"每个环节的天花板多高"。完整设计见 [评测体系设计.md](评测体系设计.md)，实施与调优结果见 [docs/方案推演.md](docs/方案推演.md) 第 16 节。
 
@@ -226,8 +231,15 @@ eval/
   stages.py           六个阶段的打分函数（纯函数）
   attribution.py      错误归因决策树
   regression.py       无模型回归套件，与 eval/golden 快照逐分片比
+  selfcheck.py        评测自检：故意破坏 → 每个归因标签抓得住；"能抓住什么、抓不住什么"
+  features.py         调参闭环第一步：检索一次，存全部候选链的五项分量
+  rescore.py          任意 (权重, 阈值) 毫秒级重放三道闸门
+  tune.py             搜权重阈值 → 可辨识表 → 约束 → 提案；--apply 写参数新版本
+  calibrate.py        保序回归校准（只报不接闸门）
+  splits.py           eval / calib / train 划分与有效样本门槛
   check_manifest.py   录音清单与评测集 schema 校验
   asr_cache.py        ASR 结果磁盘缓存（同一段音频只让模型跑一次）
+data/params/          后处理参数（版本化 JSON）与调参目标配置
 scripts/              权重校验、格式转换、地址库构建、清单生成、合成扰动集生成
 data/                 地址库与测试数据，来源标注见 data/README.md
 docs/方案推演.md       完整的方案推导过程与评测调优结果

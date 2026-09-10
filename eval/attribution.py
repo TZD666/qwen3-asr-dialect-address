@@ -20,11 +20,12 @@
 
 from __future__ import annotations
 
+from dialect_addr import rank as rank_mod
+
 LABELS = (
     "skip", "db_missing", "asr_unrecoverable", "normalize_error", "recall_miss",
     "rank_error", "gate_over_accept", "gate_over_reject", "completion_error", "assembly_error",
 )
-MAX_DIST = 0.40
 
 
 def attribute(rec: dict) -> tuple[str | None, str]:
@@ -48,12 +49,16 @@ def attribute(rec: dict) -> tuple[str | None, str]:
         return "db_missing", f"库中无「{'、'.join(lost)}」，输出为「{rec['pred']}」"
     if not rec.get("gold_in_db", True) and not missing:
         return "db_missing", f"库中无「{rec.get('gold_deepest_name', '') or '真值区级条目'}」"
+    # 地名原样保住了、但因为库里没有它而拦下（reject/partial），省市区无从回溯：还是库缺，
+    # 不是补全错。补全只在有候选链时才谈得上——评测自检曾把这种情形误归到 completion_error。
+    if missing and rec.get("decision") in ("reject", "partial", "empty") and not e2e.get("admin_all", True):
+        return "db_missing", f"库中无「{'、'.join(missing)}」，决策 {rec.get('decision')}，省市区无法回溯"
 
     # 3. 声学层错到拼音也救不回
-    if a.get("name_phon_dist_max") is not None and a["name_phon_dist_max"] > MAX_DIST:
+    if a.get("name_phon_dist_max") is not None and a["name_phon_dist_max"] > rank_mod.MAX_DIST:
         worst = max(a.get("names", []), key=lambda p: p["dist_phon_w"], default={})
         return "asr_unrecoverable", (
-            f"「{worst.get('name')}」在 ASR 输出里最近片段「{worst.get('seg')}」音距离 {worst.get('dist_phon_w')} > {MAX_DIST}"
+            f"「{worst.get('name')}」在 ASR 输出里最近片段「{worst.get('seg')}」音距离 {worst.get('dist_phon_w')} > {rank_mod.MAX_DIST}"
         )
 
     # 4. 归一化：B 错，且下游 C/D/E（可评的部分）都对

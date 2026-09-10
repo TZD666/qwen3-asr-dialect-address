@@ -29,7 +29,6 @@ from dialect_addr.romanize import resolve_space
 ADMIN = ("province", "city", "district")
 GEO = ("street", "road", "community")
 TAIL = ("house_no", "building", "unit", "room")
-MAX_DIST = 0.40
 _HAN = re.compile(r"[一-鿿]")
 _ILLEGAL_NUM = re.compile(f"({_CN_NUM})({_UNITS})")
 
@@ -334,10 +333,10 @@ def _miss_reason(ranking: RankResult, gold: GoldChain, db: AddressDB, dialect: s
     if bw is None:
         return "window_miss", "条目无法罗马化"
     d, span, nm = bw
-    eff, L = effective_max_dist(nm, space, MAX_DIST)
+    eff, L = effective_max_dist(nm, space, rank_mod.MAX_DIST)
     seg = han[span[0]:span[1]]
-    if d > MAX_DIST:
-        return "dist_over_max", f"最近窗口「{seg}」vs「{nm}」dist={d:.3f} > {MAX_DIST}"
+    if d > rank_mod.MAX_DIST:
+        return "dist_over_max", f"最近窗口「{seg}」vs「{nm}」dist={d:.3f} > {rank_mod.MAX_DIST}"
     if d > eff:
         return "weak_filtered", f"「{seg}」vs「{nm}」dist={d:.3f} > 短名阈值 {eff:.3f}（{L} 音节）"
     return "window_miss", f"「{seg}」vs「{nm}」dist={d:.3f} 在阈值内却未命中（预筛/籍贯排除/同层抑制）"
@@ -470,7 +469,7 @@ def stage_e(decision: str, ok_deliverable: bool, ok_geo: bool, feats: dict, tail
         "quadrant": quadrant(decision, ok_deliverable),        # 与损失对齐：错送 = 交付地址错
         "quadrant_geo": quadrant(decision, ok_geo),            # 归因用：闸门只管地名链，不管门牌
     }
-    q = r["quadrant"]
+    q, qg = r["quadrant"], r["quadrant_geo"]
     if q == "FA":
         if ok_geo and not tail_ok:
             r["gate_attrib"] = "tail"          # 地名链对、门牌错：三道闸门都不看门牌
@@ -480,14 +479,16 @@ def stage_e(decision: str, ok_deliverable: bool, ok_geo: bool, feats: dict, tail
             r["gate_attrib"] = "sim"
         else:
             # 两道闸门谁离拦下它最近，就记在谁头上
-            mm, sm = rank_mod.MARGIN_MIN, rank_mod.SIM_MIN
+            mm, sm = max(rank_mod.MARGIN_MIN, 1e-9), max(rank_mod.SIM_MIN, 1e-9)    # 阈值为 0 时不除零
             m_slack = (feats["margin"] - mm) / mm if feats["second_total"] is not None else 9.0
             s_slack = (feats["top_sim"] - sm) / sm
             if feats["second_total"] is not None and feats["margin"] < mm and not feats["second_admin_differs"]:
                 r["gate_attrib"] = "margin(same_admin_exempt)"
             else:
                 r["gate_attrib"] = "margin" if m_slack < s_slack else "sim"
-    elif q == "FR":
+    elif q == "FR" or qg == "FR":
+        # 拦截归因按**链**的四格：reject 时交出去的是原文，deliverable 四格会记成 TR，
+        # 但归因树按 quadrant_geo 判 FR（链是对的），gate_attrib 必须跟着给出来
         r["gate_attrib"] = {"reject": "sim", "ambiguous": "margin", "partial": "partial", "empty": "empty"}.get(decision, decision)
     r["ok"] = q in ("TP", "TR")
     return r

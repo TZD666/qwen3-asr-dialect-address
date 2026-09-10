@@ -155,7 +155,7 @@ def test_stage_a_homophone_error_is_fully_recoverable():
 def test_stage_a_unrelated_name_exceeds_max_dist():
     """劝业场 → 雪山湖：音也对不上，超过 0.40 就是声学层的错，后处理够不着。"""
     r = S.stage_a(_A_REF.replace("劝业场", "雪山湖"), _A_REF, _A_NAMES, None)
-    assert r["name_phon_dist_max"] > S.MAX_DIST
+    assert r["name_phon_dist_max"] > S.rank_mod.MAX_DIST
     assert r["recoverable_share"] == 0.0
     worst = max(r["names"], key=lambda p: p["dist_phon_w"])
     assert worst["name"] == "劝业场"

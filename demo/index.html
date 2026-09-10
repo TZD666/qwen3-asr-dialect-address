@@ -144,6 +144,11 @@ async function poll(){
     const dot = $('#dot'), st = $('#status');
     if (status.no_model){ dot.className='dot'; st.textContent='未加载模型（仅文本链路）'; $('#rec').disabled=true; }
     else if (status.model_ready){ dot.className='dot ok'; st.textContent=`模型就绪 · ${status.device} · 加载 ${status.load_time}s`; $('#rec').disabled=false; }
+    // 跑的是哪一版：参数文件版本 + 代码提交号。两个端口上的服务只有这行能分出新旧。
+    if (status.params){
+      const p = status.params;
+      st.textContent += ` · 参数 v${p.version}(${p.source}${p.below_threshold ? '·未达门槛' : ''}) · ${status.git_commit || '?'}`;
+    }
     else if (status.model_error){ dot.className='dot bad'; st.textContent='模型加载失败：'+status.model_error.slice(0,80); }
     else { dot.className='dot'; st.textContent='模型加载中…（4.7GB，首次约 1 分钟）'; setTimeout(poll, 2000); }
     fillDialects(status.dialect_families);

@@ -43,3 +43,7 @@ eval/cache/
 # ---- 评测报告：带时间戳的 json 全部忽略（md 报告保留）----
 eval/reports/2*.json
 eval/cache_recordings.log
+
+# ---- 调参提案 / 自检的 json 是派生物，md 留档 ----
+eval/tuning/*.json
+eval/selfcheck/*.json

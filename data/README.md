@@ -13,6 +13,7 @@ timestamp: 2026-09-10
 | 路径 | 类别 | 体积 | 来源 |
 |---|---|---|---|
 | `addresses/` | 地址库 | 0.8 MB | 公开行政区划数据 |
+| `params/` | 后处理参数与调参配置 | 4 KB | `rank_params.json` v1 手设；`eval/tune.py --apply` 写新版本 |
 | `eval/xinan_guanhua.json`、`eval/录音指南.md` | 评测集 | 24 KB | 本项目编写 |
 | `eval/manifest.jsonl`、`eval/splits.json` | 录音清单与划分 | 30 KB | 脚本生成 + 人工草稿 |
 | `eval/negatives/` | 负样本定义 | 4 KB | 本项目编写 |

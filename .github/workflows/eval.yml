@@ -45,3 +45,18 @@ jobs:
         run: python scripts/gen_perturbed.py --verify
       - name: 回归（与 eval/golden 逐分片比）
         run: python eval/regression.py
+      - name: 评测自检（故意破坏 → 每个归因标签都抓得住）
+        run: python eval/selfcheck.py --fast --ci
+      - name: 调参提案（只产提案，不落地；apply 永远是本地显式命令）
+        run: |
+          python eval/features.py --sources text,synthetic,oov
+          python eval/tune.py
+      - name: 上传提案与自检报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tuning-proposal
+          path: |
+            eval/tuning/
+            eval/selfcheck/
+          if-no-files-found: ignore

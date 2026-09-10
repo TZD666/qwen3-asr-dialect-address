@@ -40,10 +40,41 @@ sys.path.insert(0, str(ROOT / "src"))
 from dialect_addr.address_db import AddressDB  # noqa: E402
 from dialect_addr.asr import Qwen3ASR, DEFAULT_MODEL_DIR  # noqa: E402
 from dialect_addr.pipeline import Pipeline, Result  # noqa: E402
+from dialect_addr.rank import current_params as rank_current_params, params_info as rank_params_info  # noqa: E402
 from dialect_addr.romanize import DIALECT_ROUTING, SPACES, family_of  # noqa: E402
 
 HTML = ROOT / "demo" / "index.html"
 REC_DIR = ROOT / "data" / "eval" / "audio" / "recordings"
+
+
+def _git_head() -> str:
+    """当前提交短号。只读 .git 文件，不依赖 git 命令；读不到返回 unknown。"""
+    try:
+        head = (ROOT / ".git" / "HEAD").read_text(encoding="utf-8").strip()
+        if head.startswith("ref: "):
+            ref = ROOT / ".git" / head[5:]
+            if ref.exists():
+                return ref.read_text(encoding="utf-8").strip()[:7]
+            packed = ROOT / ".git" / "packed-refs"
+            if packed.exists():
+                for line in packed.read_text(encoding="utf-8").splitlines():
+                    if line.endswith(" " + head[5:]):
+                        return line.split()[0][:7]
+            return "unknown"
+        return head[:7]
+    except Exception:
+        return "unknown"
+
+
+def _db_sha1() -> str:
+    import hashlib
+    import os
+
+    p = Path(os.environ.get("DIALECT_ADDR_DB") or (ROOT / "data" / "addresses" / "cn_subset.json")).expanduser()
+    try:
+        return hashlib.sha1(p.read_bytes()).hexdigest()[:12]
+    except Exception:
+        return "unknown"
 
 STATE: dict = {
     "model_ready": False,
@@ -169,6 +200,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json({
                 **STATE,
                 "two_pass": PIPE.two_pass if PIPE else None,
+                # 跑的是哪一版：代码提交号 + 参数文件版本 + 地址库指纹。没有这三样，两个端口上的服务分不出新旧。
+                "git_commit": _git_head(),
+                "params": {**rank_params_info(), "values": rank_current_params()},
+                "db_sha1": _db_sha1(),
                 "db_stats": db.stats(),
                 "spaces": {k: {"name": v.name, "available": v.available, "reason": v.reason}
                            for k, v in SPACES.items()},

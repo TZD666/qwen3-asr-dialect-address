@@ -208,6 +208,11 @@ def _clean_free(seg: str, is_lead: bool, after_hit: bool = False, trailing: bool
     return "".join(_clean_free_pieces(seg, is_lead, after_hit, trailing))
 
 
+def _starts_with_filler(s: str) -> bool:
+    """接下来的文本是不是口语填充（那个/旁边/的…）而不是地名的延续。"""
+    return bool(s) and (s[0] in _FILLER_EDGE or any(s.startswith(w) for w in _FILLER_MULTI) or s[0] in _CHATTER)
+
+
 def _absorbed_by_hit(piece: str, disp: str, side: str, max_dist: float = 0.30) -> bool:
     """紧挨着命中片段的一小段自由文本，是不是命中名字被听错的开头/结尾。
 
@@ -288,6 +293,11 @@ def _assemble(
                 continue
             e_ = h.entry
             disp = h.matched_name if (len(h.matched_name) > len(e_.name) and e_.name in h.matched_name) else e_.name
+            # 路级的弱别名命中（2 字别名「玉林」→ 玉林街道）后面还紧跟着地名字（"玉林南路"）：
+            # 说话人说的是一条更长的路，库里没有它。别把"街道"塞进去，原文保留。
+            if h.weak and h.matched_name != e_.name and lv not in ADMIN and ne < n \
+                    and _HAN.match(norm_text[ne]) and not _starts_with_filler(norm_text[ne:]):
+                disp = norm_text[ns:ne]
             # 说话人在库名后面紧接着说了一个道路类型字（库里叫"中街"，人说"中街路"）：
             # 那是名字的一部分，跟着输出，不当孤立后缀删掉。库名本身已带类型后缀的不动。
             if ne < n and norm_text[ne] in _ROAD_TYPE_CHARS and not disp.endswith(_TYPE_SUFFIX_BLOCK) \

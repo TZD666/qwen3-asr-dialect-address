@@ -105,7 +105,10 @@ def main() -> None:
         sys.exit("--set 与 --update-golden 不能同用：破坏测试的结果不许写进快照")
     for kv in a.set:
         k, v = kv.split("=", 1)
-        setattr(run_eval.rank_mod, k, float(v))
+        if k in run_eval.rank_mod.TUNABLE:
+            run_eval.rank_mod.apply_params({k: float(v)})
+        else:
+            setattr(run_eval.rank_mod, k, float(v))
         print(f"[override] rank.{k} = {v}")
     GOLDEN.mkdir(parents=True, exist_ok=True)
 

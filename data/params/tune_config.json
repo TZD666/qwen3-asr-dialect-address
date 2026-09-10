@@ -1,0 +1,29 @@
+{
+  "_note": "eval/tune.py 的目标与门槛。代价比 c_fa:c_fr 由业务定：一次错送的成本远高于一次确认。",
+  "costs": {
+    "c_fa": 10,
+    "c_fr": 1,
+    "c_tr": 1,
+    "c_miss": 0
+  },
+  "search": {
+    "restarts": 20,
+    "seed": 20260910,
+    "max_sweeps": 10,
+    "weight_grid": 21,
+    "threshold_step": 0.01,
+    "l1_tiebreak": 0.001
+  },
+  "thresholds": {
+    "train": 500,
+    "calib": 300,
+    "per_difficulty": 30,
+    "calib_each_class": 50
+  },
+  "risk_targets": [
+    0.01,
+    0.02,
+    0.05
+  ],
+  "count_drafts": true
+}

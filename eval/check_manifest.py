@@ -30,7 +30,6 @@ from stages import gold_chain  # noqa: E402
 REC = ROOT / "data" / "eval" / "audio" / "recordings"
 MANIFEST = ROOT / "data" / "eval" / "manifest.jsonl"
 EVAL = ROOT / "data" / "eval" / "xinan_guanhua.json"
-SPLITS = ROOT / "data" / "eval" / "splits.json"
 
 DIALECT_GROUPS = {"官话", "粤", "闽", "吴", "湘", "赣", "客", ""}
 DEPTHS = {"full", "district", "street_only", "none", ""}
@@ -99,13 +98,15 @@ def check(strict: bool = False) -> list[str]:
             if k not in it:
                 errs.append(f"item {it['id']}: 缺字段 {k}")
 
-    if SPLITS.exists():
-        sp = json.loads(SPLITS.read_text(encoding="utf-8"))
-        for name in ("calib", "train"):
-            n = len(sp.get(name, {}).get("items", [])) + len(sp.get(name, {}).get("files", []))
-            thr = sp.get("thresholds", {}).get(name, 0)
-            if 0 < n < thr:
-                errs.append(f"splits.{name} 有 {n} 条但未达门槛 {thr}，应为空")
+    # 划分完整性：合成集按 source_id 不重不漏；自发录音在门槛前全部 eval
+    from splits import check_synthetic_partition, load_splits, split_of
+    errs.extend(check_synthetic_partition([it["id"] for it in data["items"]]))
+    sp = load_splits()
+    n_spont = sum(1 for r in rows if r.get("quality") == "ok" and r.get("set", "spontaneous") == "spontaneous")
+    if n_spont <= sp.get("recordings", {}).get("spontaneous_threshold", 150):
+        for r in rows:
+            if r.get("quality") == "ok" and split_of("recording", r["file"]) != "eval":
+                errs.append(f"{r['file']}: 自发录音未达 150 条前应全部为 eval")
 
     ok_rows = [r for r in rows if r.get("quality") == "ok"]
     print(f"清单 {len(rows)} 行，quality=ok {len(ok_rows)}，"

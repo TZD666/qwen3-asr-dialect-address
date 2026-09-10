@@ -50,12 +50,13 @@ from stages import (  # noqa: E402
     score_e2e, stage_a, stage_b, stage_c, stage_d, stage_e, stage_f,
 )
 from stats import MIN_N_FOR_PCT, bootstrap_diff, ece, fmt_rate, mcnemar, rule_of_three  # noqa: E402
+from splits import split_of  # noqa: E402
 
 AUDIO_ROOT = ROOT / "data" / "eval" / "audio"
 MANIFEST = ROOT / "data" / "eval" / "manifest.jsonl"
 NEG_DIR = ROOT / "data" / "eval" / "negatives"
 GOLDEN_DIR = ROOT / "eval" / "golden"
-AXES = ("dialect_group", "address_depth", "noise", "difficulty", "negative_type", "short_name", "rule")
+AXES = ("dialect_group", "address_depth", "noise", "difficulty", "negative_type", "short_name", "rule", "split")
 OPTIONAL_AXES = ("rule",)      # 只有合成集才有；值为空的样本不进这个轴
 GRID_MARGIN = [round(0.02 + 0.02 * i, 2) for i in range(10)]        # 0.02 … 0.20
 GRID_SIM = [round(0.50 + 0.02 * i, 2) for i in range(16)]           # 0.50 … 0.80
@@ -83,8 +84,13 @@ def load_items(path: Path) -> tuple[dict, list[dict]]:
         cfg = path.with_name("gen_config.json")
         meta = json.loads(cfg.read_text(encoding="utf-8")) if cfg.exists() else {}
         meta.setdefault("name", path.stem)
+        for it in items:
+            # 合成集按 source_id 分组划分（同一句的变体不跨集），splits.json 是唯一来源
+            it["split"] = split_of("synthetic", str(it.get("source_id", it["id"])))
         return meta, items
     data = json.loads(path.read_text(encoding="utf-8"))
+    for it in data["items"]:
+        it["split"] = split_of("read_item", it["id"])
     return data.get("_meta", {"name": path.stem}), data["items"]
 
 
@@ -109,7 +115,7 @@ def manifest_to_items(rows: list[dict]) -> list[dict]:
             "dialect_group": r.get("dialect_group", ""), "sub_dialect": r.get("sub_dialect", ""),
             "address_depth": r.get("address_depth", ""), "noise": r.get("noise", ""),
             "orthography_expected": r.get("orthography_expected", ""), "gold_in_db": r.get("gold_in_db"),
-            "negative_type": r.get("negative_type"), "split": r.get("split", "eval"),
+            "negative_type": r.get("negative_type"), "split": split_of("recording", r["file"], r.get("speaker_id")),
             "set": r.get("set", "spontaneous"), "speaker_id": r.get("speaker_id", ""),
             "has_address": has_addr, "scored": bool(labeled), "label_status": r.get("label_status"),
             "quality": r.get("quality", "ok"),
@@ -323,6 +329,8 @@ def run_once(mode: str, items: list[dict], db: AddressDB, asr, dialect: str | No
         rec["scored"] = it.get("scored", True)
         rec["quality"] = it.get("quality", "ok")
         rec["has_address"] = it.get("has_address", True)
+        if it.get("stage_a_force"):
+            rec["stage_a_force"] = True
         res = None
         raw_for_a = it["spoken"]
         if mode == "text":
@@ -345,7 +353,15 @@ def run_once(mode: str, items: list[dict], db: AddressDB, asr, dialect: str | No
                 from dialect_addr.asr import normalize_dialect_label
                 used_dialect = normalize_dialect_label(a.language) or dialect
             else:
-                res = pipe.process(str(ap), dialect_hint=dialect)
+                try:
+                    res = pipe.process(str(ap), dialect_hint=dialect)
+                except RuntimeError as e:
+                    # 只读 ASR 缓存下没跑过的音频（新录音的第 2 遍）：跳过，不算错
+                    if "ASR 缓存未命中" not in str(e):
+                        raise
+                    rec.update(raw="", pred="", fields={}, decision="no_cache", chosen="-", skipped=True)
+                    rows.append(rec)
+                    continue
                 rec.update(raw=res.pass1.raw_text, pred=res.address, fields=res.fields, decision=res.final.decision,
                            reason=res.final.ranking.reason, chosen=res.chosen, lang=res.dialect,
                            pass2_raw=res.pass2.raw_text if res.pass2 else "",
@@ -575,6 +591,8 @@ def build_report(run: dict) -> str:
         f"# 方言地址识别评测 v2（{mode}{' · ' + run['tag'] if run.get('tag') else ''}）", "",
         f"- 评测集: {meta.get('name', '')}  计分 {n} 条，未标注/跳过 {len(rows) - n} 条  耗时 {run['elapsed']:.0f}s",
         f"- 负样本: {run['negatives']}  oracle: {run['oracle'] or '无'}  阈值: MARGIN_MIN={rank_mod.MARGIN_MIN} SIM_MIN={rank_mod.SIM_MIN}",
+        f"- 参数: v{run['params'].get('version')}（{run['params'].get('source')}，{run['params'].get('created')}）"
+        + ("  ⚠ 未达门槛的调参结果" if run['params'].get('below_threshold') else ""),
     ]
     if run.get("db_note"):
         L.append(f"- 地址库改动: {run['db_note']}")
@@ -861,6 +879,7 @@ def run(a: argparse.Namespace) -> dict:
         "mode": mode, "tag": a.tag, "meta": meta, "negatives": negatives, "oracle": ",".join(sorted(oracle)),
         "db_note": db_note, "label_note": label_note, "rows": rows, "summary": summary,
         "thresholds": {"MARGIN_MIN": rank_mod.MARGIN_MIN, "SIM_MIN": rank_mod.SIM_MIN},
+        "params": {**rank_mod.params_info(), "values": rank_mod.current_params()},
         "grid": grid_scan(rows) if not a.no_grid else None,
         "calibration": calibration(rows),
         "paired": paired_stats(rows) if mode == "audio" else None,
@@ -976,9 +995,12 @@ def main() -> None:
         os.environ["DIALECT_ADDR_MODEL_DIR"] = a.model_dir
     for kv in a.set:
         k, v = kv.split("=", 1)
-        if not hasattr(rank_mod, k):
-            sys.exit(f"--set: rank 模块没有常量 {k}")
-        setattr(rank_mod, k, float(v))
+        if k in rank_mod.TUNABLE:
+            rank_mod.apply_params({k: float(v)})
+        elif hasattr(rank_mod, k):
+            setattr(rank_mod, k, float(v))
+        else:
+            sys.exit(f"--set: rank 模块没有 {k}；可调参数 {list(rank_mod.TUNABLE)}")
         print(f"[override] rank.{k} = {v}")
 
     run_obj = run(a)

@@ -1,5 +1,5 @@
 {
- "created": "2026-09-10T14:19:00",
+ "created": "2026-09-10T16:03:46",
  "mode": "text",
  "tag": "",
  "negatives": "none",
@@ -2044,6 +2044,133 @@
     "preserved": 0
    },
    "negative_type=null": {
+    "n": 24,
+    "exact": [
+     24,
+     24
+    ],
+    "deliverable": [
+     24,
+     24
+    ],
+    "admin_all": [
+     24,
+     24
+    ],
+    "tail_all": [
+     24,
+     24
+    ],
+    "geo_recall_mean": [
+     0.958,
+     24
+    ],
+    "A.cer_char": [
+     null,
+     0
+    ],
+    "A.cer_phon": [
+     null,
+     0
+    ],
+    "A.cer_name_char": [
+     null,
+     0
+    ],
+    "A.cer_name_phon": [
+     null,
+     0
+    ],
+    "A.recoverable_share": [
+     null,
+     0
+    ],
+    "B.lexicon_hit": [
+     24,
+     24
+    ],
+    "B.number_ok": [
+     24,
+     24
+    ],
+    "B.tail_exact": [
+     24,
+     24
+    ],
+    "B.illegal_number_caught": [
+     24,
+     24
+    ],
+    "B.filler_leak": [
+     0.0,
+     24
+    ],
+    "C.recall_hit": [
+     24,
+     24
+    ],
+    "C.recall_chain@1": [
+     24,
+     24
+    ],
+    "C.recall_chain@3": [
+     24,
+     24
+    ],
+    "C.recall_chain@all": [
+     24,
+     24
+    ],
+    "D.top1_correct": [
+     24,
+     24
+    ],
+    "D.mrr": [
+     1.0,
+     24
+    ],
+    "F.backfill_correct": [
+     19,
+     19
+    ],
+    "F.wrong_hit_wrong_city": [
+     0,
+     19
+    ],
+    "F.backfill_confidence_gap": [
+     19,
+     19
+    ],
+    "E.coverage": [
+     24,
+     24
+    ],
+    "E.risk": [
+     0,
+     24
+    ],
+    "E.over_reject": [
+     0,
+     24
+    ],
+    "E.nbest_recall@3": [
+     0,
+     0
+    ],
+    "E.quadrant": {
+     "TP": 24,
+     "FA": 0,
+     "FR": 0,
+     "TR": 0
+    },
+    "attribution": {},
+    "decisions": {
+     "confident": 24
+    },
+    "over_correction": 0,
+    "preserved": 0
+   },
+   "split=eval": {
     "n": 24,
     "exact": [
      24,

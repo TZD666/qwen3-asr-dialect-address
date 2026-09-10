@@ -35,8 +35,11 @@ ASR 错，不是听错了，是它的语言模型先验是"通用中文"——�
 
 from __future__ import annotations
 
+import json
+import os
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .address_db import LEVEL_ORDER, AddressDB, AddressEntry, Level
 from .pinyin_dialect import Syllable, syllable_distance, syllable_edit_distance
@@ -54,17 +57,97 @@ _LEVEL_W: dict[str, float] = {
     "province": 0.6, "city": 0.8, "district": 1.0, "street": 1.1, "road": 1.2, "poi": 1.2,
 }
 
-# 打分权重。总和 1，便于把 total 当成 0~1 的置信度读。
-W_SIM, W_COV, W_PRIOR, W_DEPTH = 0.50, 0.20, 0.15, 0.15
-W_CONFLICT = 0.25          # 冲突惩罚（减项）
+# --------------------------------------------------------------------------
+# 可调参数：从 data/params/rank_params.json 读，不写死在代码里
+#
+#   W_SIM / W_COV / W_PRIOR / W_DEPTH   打分权重，总和 1，便于把 total 当成 0~1 的置信度读
+#   W_CONFLICT                          冲突惩罚（减项）
+#   MARGIN_MIN                          Top1-Top2 分差低于此 → ambiguous
+#   SIM_MIN                             Top1 音相似度低于此 → reject
+#   SINGLE_HIT_MIN_COV                  全句只有一处近似命中且覆盖率低于此 → reject（孤证不立，见 decide）
+#   STRONG_HIT                          距离低于此视为"强命中"，用于冲突检测
+#   LONGER_NAME_TOL                     同一条目：更长的名字距离不比最短的差这么多，就用更长的（见 best_window）
+#   UNIQUE_SHORT_MAX                    ≤2 音节但全库拼音唯一、且几乎精确命中的名字，不按弱命中处理（澳门/台湾）
+#   MAX_DIST                            滑窗命中的最大归一化音距离
+#
+# 参数是数据不是代码：哪一版、手设还是学出来的、基于哪份数据快照，都记在 JSON 里，
+# 服务的 /api/status 报的就是它。eval/tune.py 出提案，人执行 --apply 才写新版本。
+# 模块属性名保持不变，所以 eval 里的 rank_mod.X、--set 覆盖、测试都不用改。
+# --------------------------------------------------------------------------
 
-# 决策阈值
-MARGIN_MIN = 0.06          # Top1-Top2 分差低于此 → ambiguous
-SIM_MIN = 0.62             # Top1 音相似度低于此 → reject
-STRONG_HIT = 0.15          # 距离低于此视为"强命中"，用于冲突检测
-LONGER_NAME_TOL = 0.08     # 同一条目：更长的名字距离不比最短的差这么多，就用更长的（见 best_window）
-UNIQUE_SHORT_MAX = 0.05    # ≤2 音节但全库拼音唯一、且几乎精确命中的名字，不按弱命中处理（澳门/台湾）
-SINGLE_HIT_MIN_COV = 0.25  # 全句只有一处近似命中且覆盖率低于此 → reject（孤证不立，见 decide）
+TUNABLE: tuple[str, ...] = (
+    "W_SIM", "W_COV", "W_PRIOR", "W_DEPTH", "W_CONFLICT", "MARGIN_MIN", "SIM_MIN",
+    "SINGLE_HIT_MIN_COV", "STRONG_HIT", "LONGER_NAME_TOL", "UNIQUE_SHORT_MAX", "MAX_DIST",
+)
+
+
+def _default_params_path() -> Path:
+    env = os.environ.get("DIALECT_ADDR_PARAMS")
+    if env:
+        return Path(env).expanduser()
+    return Path(__file__).resolve().parents[2] / "data" / "params" / "rank_params.json"
+
+
+PARAMS_PATH = _default_params_path()
+_PARAMS: dict = {}
+
+
+def load_params(path: str | Path | None = None) -> dict:
+    """读参数文件。缺文件是明确的错误，和地址库一个契约——没有参数就没有可复现的行为。"""
+    p = Path(path) if path else PARAMS_PATH
+    if not p.exists():
+        raise FileNotFoundError(f"参数文件不存在: {p}（环境变量 DIALECT_ADDR_PARAMS 可指定）")
+    data = json.loads(p.read_text(encoding="utf-8"))
+    missing = [k for k in TUNABLE if k not in data.get("params", {})]
+    if missing:
+        raise ValueError(f"{p} 缺参数 {missing}")
+    return data
+
+
+def apply_params(params: dict) -> None:
+    """把一组参数写成本模块的属性。只认 TUNABLE 里的名字，写错名字直接报错而不是静默无效。"""
+    unknown = [k for k in params if k not in TUNABLE]
+    if unknown:
+        raise KeyError(f"不是可调参数: {unknown}；可调的有 {list(TUNABLE)}")
+    g = globals()
+    for k, v in params.items():
+        g[k] = float(v)
+
+
+def current_params() -> dict[str, float]:
+    g = globals()
+    return {k: g[k] for k in TUNABLE}
+
+
+def params_info() -> dict:
+    """给报告头和 /api/status 用：跑的是哪一版参数。"""
+    return {
+        "version": _PARAMS.get("version"), "source": _PARAMS.get("source"), "created": _PARAMS.get("created"),
+        "below_threshold": bool(_PARAMS.get("below_threshold")), "path": str(PARAMS_PATH),
+        "calibrated": _PARAMS.get("calibration") is not None,
+    }
+
+
+def calibrated_prob(total: float) -> float | None:
+    """校准表（保序回归分段常数）存在时，把 Chain.total 映射成 P(正确)；没有校准表返回 None。
+    只用于展示，闸门仍走 MARGIN_MIN / SIM_MIN。"""
+    cal = _PARAMS.get("calibration")
+    if not cal:
+        return None
+    pts = cal.get("breakpoints") or []     # [[x, p], ...] x 升序
+    if not pts:
+        return None
+    prob = pts[0][1]
+    for x, pv in pts:
+        if total >= x:
+            prob = pv
+        else:
+            break
+    return float(prob)
+
+
+_PARAMS = load_params()
+apply_params(_PARAMS["params"])
 
 
 @dataclass
@@ -212,27 +295,30 @@ def best_window(
     return d, span, nm
 
 
-def effective_max_dist(name: str, space: PhonSpace, max_dist: float = 0.40) -> tuple[float, int]:
+def effective_max_dist(name: str, space: PhonSpace, max_dist: float | None = None) -> tuple[float, int]:
     """短名字更容易撞车：两音节的名字在任意文本里找到距离 0.33 的窗口太容易了。
     名字越短，要求的距离越严。三音节及以上用满额阈值。返回 (有效阈值, 音节数)。"""
+    max_dist = MAX_DIST if max_dist is None else max_dist
     L_hit = len(space.romanizer(name))
     return max_dist * min(1.0, L_hit / 3.0), L_hit
 
 
-_COLLISION_CACHE: dict[tuple[int, str], dict[str, int]] = {}
-
-
-def pinyin_collisions(entries: list[AddressEntry], space: PhonSpace) -> dict[str, int]:
+def pinyin_collisions(entries: list[AddressEntry], space: PhonSpace, owner: object | None = None) -> dict[str, int]:
     """全库每个名字（正名+别名）的无调拼音串 → 有多少个**不同条目**叫这个音。
 
     区分度代替音节数（方案推演 §15.5）：2 音节名字不能一刀切成弱命中。
     xiangcheng 撞 6 个区、gulou 撞 4 个，那是真弱；aomen / taiwan 全库唯一，
     精确命中时就是说话人在报这个地方，不该被当噪声。
+
+    缓存挂在 owner（通常是 AddressDB 对象）上，按音系名分开。不能按 entries 列表的 id 缓存：
+    rank() 每次都新建 pool 列表，id 会被 Python 回收复用，多库同进程时会拿到别的库的表。
     """
-    key = (id(entries), space.name)
-    hit = _COLLISION_CACHE.get(key)
-    if hit is not None:
-        return hit
+    cache: dict | None = None
+    if owner is not None:
+        cache = owner.__dict__.setdefault("_collisions", {})
+        hit = cache.get(space.name)
+        if hit is not None:
+            return hit
     owners: dict[str, set[str]] = {}
     for e in entries:
         for nm in e.all_names():
@@ -240,7 +326,8 @@ def pinyin_collisions(entries: list[AddressEntry], space: PhonSpace) -> dict[str
             if py:
                 owners.setdefault(py, set()).add(e.adcode)
     table = {py: len(o) for py, o in owners.items()}
-    _COLLISION_CACHE[key] = table
+    if cache is not None:
+        cache[space.name] = table
     return table
 
 
@@ -266,13 +353,15 @@ def find_hits(
     syls: tuple[Syllable, ...],
     entries: list[AddressEntry],
     space: PhonSpace,
-    max_dist: float = 0.40,
+    max_dist: float | None = None,
+    db: AddressDB | None = None,
 ) -> list[Hit]:
     """滑窗对齐：对每个条目找最像的窗口，按短名收紧阈值，再做同层非极大值抑制。"""
+    max_dist = MAX_DIST if max_dist is None else max_dist
     n = len(syls)
     if n == 0:
         return []
-    collisions = pinyin_collisions(entries, space)
+    collisions = pinyin_collisions(entries, space, owner=db)
     hits: list[Hit] = []
     for e in entries:
         best = best_window(syls, e, space)
@@ -390,8 +479,12 @@ def build_chains(db: AddressDB, hits: list[Hit], n_chars: int) -> list[Chain]:
         # 父节点不能替它担保：南阳市下面 12 个县，随便哪个县的 2 字别名撞上文本，
         # 南阳市这个强命中都会"印证"它——"阳河"→唐河县就是这么来的。
         # 2 字**全名**（双楠、南坪）不在此列：它们是完整地名，有上级强命中就够。
-        deepest = max(ch_hits, key=lambda x: LEVEL_ORDER.index(x.entry.level))
-        if deepest.weak and deepest.matched_name != deepest.entry.name:
+        # 看最深一级的**全部**命中：只要有一个不是 2 字别名撞出来的，链就成立。
+        # 之前只看"主路"那一个——主路取的是文本里最靠前的，"玉林南路那个玉林小区"里
+        # 玉林南路不在库时，靠前的是弱别名「玉林」，精确命中的玉林小区被连坐扔掉了。
+        deepest_lv = max(LEVEL_ORDER.index(x.entry.level) for x in ch_hits)
+        deepest_hits = [x for x in ch_hits if LEVEL_ORDER.index(x.entry.level) == deepest_lv]
+        if all(x.weak and x.matched_name != x.entry.name for x in deepest_hits):
             continue
         # 没有任何行政区命中（省/市/区都是回溯出来的）的孤立路名，必须近乎精确。
         # 全国重名路太多（人民路/中山路/建设路），没有城市锚定时靠 ±1 宽度容错
@@ -502,12 +595,14 @@ def rank(
     db: AddressDB,
     dialect: str | None = None,
     topk: int = 5,
-    max_dist: float = 0.40,
+    max_dist: float | None = None,
 ) -> RankResult:
     """地名文本 → 排好序的候选链 + 决策。
 
     geo_text 应是 normalize.extract_tail 之后的"地名部分"——门牌以下已剥离。
+    max_dist 缺省取参数文件里的 MAX_DIST。
     """
+    max_dist = MAX_DIST if max_dist is None else max_dist
     space = resolve_space(dialect)
     han = _han_only(geo_text)
     syls = space.romanizer(han)
@@ -516,7 +611,7 @@ def rank(
 
     # 一次性在全库所有层级找命中；库只有几百条时这比逐级查更简单也更稳
     pool = [e for lv in LEVEL_ORDER for e in db.by_level[lv]]
-    hits = find_hits(han, syls, pool, space, max_dist=max_dist)
+    hits = find_hits(han, syls, pool, space, max_dist=max_dist, db=db)
     if not hits:
         return RankResult("reject", None, [], geo_text, dialect, space.name,
                           "地址库中无音近候选", all_hits=[])

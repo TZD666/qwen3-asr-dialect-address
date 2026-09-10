@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "source": "hand-set",
+  "created": "2026-09-10",
+  "note": "评测体系 v2 落地后按归因表手调（docs/方案推演.md §16.3）；与 rank.py 原常量一致",
+  "data_snapshot": {
+    "manifest": "e9dd912c275d",
+    "xinan_guanhua": "2fe17f3144fc",
+    "perturbed": "d1b23a09d2b3",
+    "cn_subset": "4fe29990e544",
+    "features": null
+  },
+  "params": {
+    "W_SIM": 0.5,
+    "W_COV": 0.2,
+    "W_PRIOR": 0.15,
+    "W_DEPTH": 0.15,
+    "W_CONFLICT": 0.25,
+    "MARGIN_MIN": 0.06,
+    "SIM_MIN": 0.62,
+    "SINGLE_HIT_MIN_COV": 0.25,
+    "STRONG_HIT": 0.15,
+    "LONGER_NAME_TOL": 0.08,
+    "UNIQUE_SHORT_MAX": 0.05,
+    "MAX_DIST": 0.4
+  },
+  "replayable": [
+    "W_SIM",
+    "W_COV",
+    "W_PRIOR",
+    "W_DEPTH",
+    "W_CONFLICT",
+    "MARGIN_MIN",
+    "SIM_MIN",
+    "SINGLE_HIT_MIN_COV"
+  ],
+  "retrieval_only": [
+    "STRONG_HIT",
+    "LONGER_NAME_TOL",
+    "UNIQUE_SHORT_MAX",
+    "MAX_DIST"
+  ],
+  "bounds": {
+    "W_SIM": [
+      0,
+      1
+    ],
+    "W_COV": [
+      0,
+      1
+    ],
+    "W_PRIOR": [
+      0,
+      1
+    ],
+    "W_DEPTH": [
+      0,
+      1
+    ],
+    "W_CONFLICT": [
+      0,
+      0.6
+    ],
+    "MARGIN_MIN": [
+      0,
+      0.25
+    ],
+    "SIM_MIN": [
+      0.5,
+      0.95
+    ],
+    "SINGLE_HIT_MIN_COV": [
+      0,
+      0.5
+    ]
+  },
+  "constraints": {
+    "simplex": [
+      "W_SIM",
+      "W_COV",
+      "W_PRIOR",
+      "W_DEPTH"
+    ]
+  },
+  "calibration": null,
+  "below_threshold": false,
+  "proposal": null,
+  "history": [
+    {
+      "version": 1,
+      "source": "hand-set",
+      "created": "2026-09-10",
+      "note": "初版，与 rank.py 原常量一致"
+    }
+  ]
+}

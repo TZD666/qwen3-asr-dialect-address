@@ -1,5 +1,5 @@
 {
- "created": "2026-09-10T14:21:13",
+ "created": "2026-09-10T16:05:57",
  "mode": "text",
  "tag": "synthetic",
  "negatives": "none",
@@ -5468,6 +5468,387 @@
     "attribution": {},
     "decisions": {
      "confident": 5
+    },
+    "over_correction": 0,
+    "preserved": 0
+   },
+   "split=eval": {
+    "n": 180,
+    "exact": [
+     180,
+     180
+    ],
+    "deliverable": [
+     180,
+     180
+    ],
+    "admin_all": [
+     180,
+     180
+    ],
+    "tail_all": [
+     180,
+     180
+    ],
+    "geo_recall_mean": [
+     0.917,
+     180
+    ],
+    "A.cer_char": [
+     null,
+     0
+    ],
+    "A.cer_phon": [
+     null,
+     0
+    ],
+    "A.cer_name_char": [
+     null,
+     0
+    ],
+    "A.cer_name_phon": [
+     null,
+     0
+    ],
+    "A.recoverable_share": [
+     null,
+     0
+    ],
+    "B.lexicon_hit": [
+     180,
+     180
+    ],
+    "B.number_ok": [
+     180,
+     180
+    ],
+    "B.tail_exact": [
+     180,
+     180
+    ],
+    "B.illegal_number_caught": [
+     180,
+     180
+    ],
+    "B.filler_leak": [
+     0.0,
+     180
+    ],
+    "C.recall_hit": [
+     180,
+     180
+    ],
+    "C.recall_chain@1": [
+     180,
+     180
+    ],
+    "C.recall_chain@3": [
+     180,
+     180
+    ],
+    "C.recall_chain@all": [
+     180,
+     180
+    ],
+    "D.top1_correct": [
+     180,
+     180
+    ],
+    "D.mrr": [
+     1.0,
+     180
+    ],
+    "F.backfill_correct": [
+     0,
+     0
+    ],
+    "F.wrong_hit_wrong_city": [
+     0,
+     0
+    ],
+    "F.backfill_confidence_gap": [
+     0,
+     0
+    ],
+    "E.coverage": [
+     180,
+     180
+    ],
+    "E.risk": [
+     0,
+     180
+    ],
+    "E.over_reject": [
+     0,
+     180
+    ],
+    "E.nbest_recall@3": [
+     0,
+     0
+    ],
+    "E.quadrant": {
+     "TP": 180,
+     "FA": 0,
+     "FR": 0,
+     "TR": 0
+    },
+    "attribution": {},
+    "decisions": {
+     "confident": 180
+    },
+    "over_correction": 0,
+    "preserved": 0
+   },
+   "split=train": {
+    "n": 360,
+    "exact": [
+     360,
+     360
+    ],
+    "deliverable": [
+     360,
+     360
+    ],
+    "admin_all": [
+     360,
+     360
+    ],
+    "tail_all": [
+     330,
+     360
+    ],
+    "geo_recall_mean": [
+     1.0,
+     360
+    ],
+    "A.cer_char": [
+     null,
+     0
+    ],
+    "A.cer_phon": [
+     null,
+     0
+    ],
+    "A.cer_name_char": [
+     null,
+     0
+    ],
+    "A.cer_name_phon": [
+     null,
+     0
+    ],
+    "A.recoverable_share": [
+     null,
+     0
+    ],
+    "B.lexicon_hit": [
+     360,
+     360
+    ],
+    "B.number_ok": [
+     360,
+     360
+    ],
+    "B.tail_exact": [
+     330,
+     360
+    ],
+    "B.illegal_number_caught": [
+     360,
+     360
+    ],
+    "B.filler_leak": [
+     0.0,
+     360
+    ],
+    "C.recall_hit": [
+     360,
+     360
+    ],
+    "C.recall_chain@1": [
+     360,
+     360
+    ],
+    "C.recall_chain@3": [
+     360,
+     360
+    ],
+    "C.recall_chain@all": [
+     360,
+     360
+    ],
+    "D.top1_correct": [
+     360,
+     360
+    ],
+    "D.mrr": [
+     1.0,
+     360
+    ],
+    "F.backfill_correct": [
+     0,
+     0
+    ],
+    "F.wrong_hit_wrong_city": [
+     0,
+     0
+    ],
+    "F.backfill_confidence_gap": [
+     0,
+     0
+    ],
+    "E.coverage": [
+     360,
+     360
+    ],
+    "E.risk": [
+     0,
+     360
+    ],
+    "E.over_reject": [
+     0,
+     360
+    ],
+    "E.nbest_recall@3": [
+     0,
+     0
+    ],
+    "E.quadrant": {
+     "TP": 360,
+     "FA": 0,
+     "FR": 0,
+     "TR": 0
+    },
+    "attribution": {},
+    "decisions": {
+     "confident": 360
+    },
+    "over_correction": 0,
+    "preserved": 0
+   },
+   "split=calib": {
+    "n": 180,
+    "exact": [
+     180,
+     180
+    ],
+    "deliverable": [
+     180,
+     180
+    ],
+    "admin_all": [
+     180,
+     180
+    ],
+    "tail_all": [
+     180,
+     180
+    ],
+    "geo_recall_mean": [
+     0.917,
+     180
+    ],
+    "A.cer_char": [
+     null,
+     0
+    ],
+    "A.cer_phon": [
+     null,
+     0
+    ],
+    "A.cer_name_char": [
+     null,
+     0
+    ],
+    "A.cer_name_phon": [
+     null,
+     0
+    ],
+    "A.recoverable_share": [
+     null,
+     0
+    ],
+    "B.lexicon_hit": [
+     180,
+     180
+    ],
+    "B.number_ok": [
+     180,
+     180
+    ],
+    "B.tail_exact": [
+     180,
+     180
+    ],
+    "B.illegal_number_caught": [
+     180,
+     180
+    ],
+    "B.filler_leak": [
+     0.0,
+     180
+    ],
+    "C.recall_hit": [
+     180,
+     180
+    ],
+    "C.recall_chain@1": [
+     180,
+     180
+    ],
+    "C.recall_chain@3": [
+     180,
+     180
+    ],
+    "C.recall_chain@all": [
+     180,
+     180
+    ],
+    "D.top1_correct": [
+     180,
+     180
+    ],
+    "D.mrr": [
+     1.0,
+     180
+    ],
+    "F.backfill_correct": [
+     0,
+     0
+    ],
+    "F.wrong_hit_wrong_city": [
+     0,
+     0
+    ],
+    "F.backfill_confidence_gap": [
+     0,
+     0
+    ],
+    "E.coverage": [
+     180,
+     180
+    ],
+    "E.risk": [
+     0,
+     180
+    ],
+    "E.over_reject": [
+     0,
+     180
+    ],
+    "E.nbest_recall@3": [
+     0,
+     0
+    ],
+    "E.quadrant": {
+     "TP": 180,
+     "FA": 0,
+     "FR": 0,
+     "TR": 0
+    },
+    "attribution": {},
+    "decisions": {
+     "confident": 180
     },
     "over_correction": 0,
     "preserved": 0

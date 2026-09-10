@@ -1,11 +1,16 @@
 {
-  "_note": "评测体系设计 §2.5：eval / calib / train 物理分开。calib 与 train 在样本量达 §2.6 门槛前为空，报告里写“未达门槛”，不用小样本凑。自发录音超过 150 条、朗读集录齐后按说话人划分（同一说话人不跨集）。",
-  "thresholds": {"calib": 300, "train": 500},
-  "eval": {
-    "items": "all",
-    "files": "all",
-    "note": "24 条朗读稿 + 全部自发录音"
+  "_note": "评测体系设计 §2.5：eval / calib / train 物理分开，这个文件是唯一来源（eval/splits.py 读它）。calib（保序回归）与 train（权重学习）在有效样本量达 §2.6 门槛前只出报告不落地参数；有效样本按“句”计——合成集同一句的 30 个变体算 1 条。",
+  "thresholds": {"calib": 300, "train": 500, "per_difficulty": 30, "calib_each_class": 50},
+  "read_items": {"rule": "24 句朗读稿全部 eval", "split": "eval"},
+  "recordings": {
+    "rule": "自发录音全部 eval，超过 150 条后按 speaker_id 划分（同一说话人不跨集）",
+    "spontaneous_threshold": 150,
+    "overrides": {}
   },
-  "calib": {"items": [], "files": []},
-  "train": {"items": [], "files": []}
+  "synthetic_by_source": {
+    "_note": "按 source_id 分组划分，同一句的变体不跨集。手工分层：train 覆盖全部 difficulty 标签（homophone 靠 019，hf_merge 靠 008，rare_char 靠 005/023），eval 每个主要标签 ≥ 20 条。",
+    "train": ["002", "005", "008", "010", "011", "013", "014", "017", "019", "020", "021", "023"],
+    "calib": ["003", "006", "009", "012", "016", "024"],
+    "eval":  ["001", "004", "007", "015", "018", "022"]
+  }
 }
